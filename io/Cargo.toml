@@ -1,12 +1,12 @@
 [package]
-name = "drivers"
+name = "io"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-io = { path = "../io" }
 volatile = "0.2.6"
 spin = "0.5.2"
+uart_16550 = "0.2.0"
 
 [dependencies.lazy_static]
 version = "1.0"
