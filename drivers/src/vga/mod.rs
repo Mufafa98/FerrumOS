@@ -1,4 +1,5 @@
 mod colors;
+pub mod tests;
 use crate::vga::colors::*;
 use core::fmt::{self, Write};
 use lazy_static::lazy_static;
