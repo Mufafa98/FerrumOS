@@ -8,3 +8,6 @@ drivers = { path = "../drivers" }
 io = { path = "../io" }
 
 x86_64 = "0.14.2"
+
+[features]
+testing = []

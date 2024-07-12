@@ -1,7 +1,7 @@
 mod colors;
-pub mod tests;
 use crate::vga::colors::*;
-use core::fmt::{self, Write};
+use core::fmt;
+// use core::fmt::{self, Write};
 use lazy_static::lazy_static;
 use spin::Mutex;
 use volatile::Volatile;
@@ -9,7 +9,7 @@ use volatile::Volatile;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        color_code: ColorCode::new(Color::White, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -33,16 +33,26 @@ pub fn _print(args: fmt::Arguments) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
-struct ScreenChar {
+pub struct ScreenChar {
     ascii_char: u8,
     color_code: ColorCode,
 }
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_WIDTH: usize = 80;
+impl ScreenChar {
+    pub fn get_ascii_char(&self) -> char {
+        char::from(self.ascii_char)
+    }
+}
+pub const BUFFER_HEIGHT: usize = 25;
+pub const BUFFER_WIDTH: usize = 80;
 
 #[repr(transparent)]
-struct Buffer {
+pub struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+}
+impl Buffer {
+    pub fn get_char(&self, i: usize, j: usize) -> &Volatile<ScreenChar> {
+        &self.chars[i][j]
+    }
 }
 pub struct Writer {
     column_position: usize,
@@ -51,6 +61,9 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn get_buffer(&mut self) -> &Buffer {
+        self.buffer
+    }
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
@@ -105,16 +118,4 @@ impl fmt::Write for Writer {
         }
         Ok(())
     }
-}
-
-pub fn print_something() {
-    let mut writer = Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
-
-    writer.write_byte(b'H');
-    writer.write_string("ello!\n");
-    write!(writer, "The numbers are {} and {}", 42, 1.0 / 3.0).unwrap();
 }
