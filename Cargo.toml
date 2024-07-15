@@ -1,0 +1,9 @@
+[workspace]
+resolver = "1"
+members = ["drivers", "interrupts", "io", "kernel", "tests", "utils"]
+
+
+# [profile.dev]
+# panic = "abort"
+[profile.release]
+panic = "abort"
