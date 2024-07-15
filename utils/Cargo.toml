@@ -1,0 +1,13 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+drivers = { path = "../drivers" }
+io = { path = "../io" }
+
+x86_64 = "0.14.2"
+
+[features]
+testing = []
