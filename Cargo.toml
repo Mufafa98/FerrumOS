@@ -1,6 +1,6 @@
 [workspace]
 resolver = "1"
-members = ["drivers", "io", "kernel", "tests", "utils"]
+members = ["drivers", "interrupts", "io", "kernel", "tests", "utils"]
 
 
 # [profile.dev]
