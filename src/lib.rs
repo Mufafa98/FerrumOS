@@ -4,6 +4,11 @@
 #![feature(abi_x86_interrupt)]
 #![test_runner(test_runner)]
 #![reexport_test_harness_main = "test_main"]
+
+extern crate alloc;
+//maybe refactor in memory?
+pub mod allocator;
+//-------------------------
 pub mod drivers;
 pub mod gdt;
 pub mod interrupts;
