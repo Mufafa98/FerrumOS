@@ -2,8 +2,44 @@ use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use linked_list_allocator::LockedHeap;
 
+pub mod bump;
+pub mod linked_list;
+
+// TO DO: move in utils?
+pub struct Locked<A> {
+    inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+    pub const fn new(inner: A) -> Self {
+        Locked {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+    pub fn lock(&self) -> spin::MutexGuard<A> {
+        self.inner.lock()
+    }
+}
+fn align_up(addr: usize, align: usize) -> usize {
+    // slower
+    let remainder = addr % align;
+    if remainder == 0 {
+        addr
+    } else {
+        addr - remainder + align
+    }
+    // can pass to the faster variant if understood
+    // faster variant:
+    // (addr + align - 1) & !(align - 1)
+    // but align has to be a power of two
+}
+
+use linked_list::LinkedListAllocator;
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+// use bump::BumpAllocator;
+// #[global_allocator]
+// static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
 
 pub struct Dummy;
 

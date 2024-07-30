@@ -6,6 +6,7 @@
 
 #[allow(unused_imports)]
 use core::panic::PanicInfo;
+use ferrum_os::io::serial;
 #[allow(unused_imports)]
 use ferrum_os::utils::panic_module::panic;
 
@@ -28,7 +29,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
     loop {}
 }
 
-use ferrum_os::println;
+use ferrum_os::{println, serial_println};
 
 use alloc::boxed::Box;
 
@@ -48,6 +49,7 @@ fn large_vec() {
     for i in 0..n {
         vec.push(i);
     }
+
     assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n / 2);
 }
 use ferrum_os::allocator::HEAP_SIZE;
@@ -58,4 +60,13 @@ fn many_boxes() {
         let x = Box::new(i);
         assert_eq!(*x, i);
     }
+}
+#[test_case]
+fn many_boxes_long_lived() {
+    let long_lived = Box::new(1); // new
+    for i in 0..HEAP_SIZE {
+        let x = Box::new(i);
+        assert_eq!(*x, i);
+    }
+    assert_eq!(*long_lived, 1); // new
 }
