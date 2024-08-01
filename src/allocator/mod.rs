@@ -3,6 +3,7 @@ use core::ptr::null_mut;
 use linked_list_allocator::LockedHeap;
 
 pub mod bump;
+pub mod fixed_size_block;
 pub mod linked_list;
 
 // TO DO: move in utils?
@@ -34,9 +35,12 @@ fn align_up(addr: usize, align: usize) -> usize {
     // but align has to be a power of two
 }
 
-use linked_list::LinkedListAllocator;
+// use linked_list::LinkedListAllocator;
+// #[global_allocator]
+// static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+use fixed_size_block::FixedSizeBlockAllocator;
 #[global_allocator]
-static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 // use bump::BumpAllocator;
 // #[global_allocator]
 // static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
