@@ -17,6 +17,9 @@ pub mod io;
 pub mod memory;
 pub mod tests;
 pub mod utils;
+//maybe refactor in multiTasking or sth?
+pub mod task;
+//--------------------------------------
 
 #[cfg(test)]
 use utils::test_runner;
