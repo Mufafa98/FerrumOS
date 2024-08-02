@@ -7,7 +7,3 @@ target = "x86_64-ferrum_os.json"
 
 [target.'cfg(target_os = "none")']
 runner = "bootimage runner --quiet"
-
-
-[alias]
-t = "test -p tests"
