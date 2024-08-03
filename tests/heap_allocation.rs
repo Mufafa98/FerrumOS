@@ -6,6 +6,7 @@
 
 #[allow(unused_imports)]
 use core::panic::PanicInfo;
+#[allow(unused_imports)]
 use ferrum_os::io::serial;
 #[allow(unused_imports)]
 use ferrum_os::utils::panic_module::panic;
@@ -28,7 +29,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
     test_main();
     loop {}
 }
-
+#[allow(unused_imports)]
 use ferrum_os::{println, serial_println};
 
 use alloc::boxed::Box;
