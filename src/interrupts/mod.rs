@@ -41,9 +41,10 @@ impl InterruptIndex {
     fn as_u8(self) -> u8 {
         self as u8
     }
-    fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
-    }
+    // Unused: To be removed
+    // fn as_usize(self) -> usize {
+    //     usize::from(self.as_u8())
+    // }
 }
 
 lazy_static! {
@@ -63,9 +64,9 @@ lazy_static! {
         // Set the handler for the page fault interrupt
         idt.page_fault.set_handler_fn(page_fault_handler);
         // Set the handler for the timer interrupt
-        idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
+        idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         // Set the handler for the keyboard interrupt
-        idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
+        idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
 
         idt
     };

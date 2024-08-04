@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+use ansi_rgb::{green_cyan, Foreground};
 #[allow(unused_imports)]
 use core::panic::PanicInfo;
 #[allow(unused_imports)]
@@ -29,7 +30,7 @@ extern "x86-interrupt" fn test_double_fault_handler(
     _stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) -> ! {
-    serial_println!("[ok]");
+    serial_println!("{}", "[ok]".fg(green_cyan()));
     exit_qemu(QemuExitCode::Success);
     ferrum_os::hlt_loop();
 }

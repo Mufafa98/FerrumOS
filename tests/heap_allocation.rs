@@ -64,10 +64,27 @@ fn many_boxes() {
 }
 #[test_case]
 fn many_boxes_long_lived() {
-    let long_lived = Box::new(1); // new
+    let long_lived = Box::new(1);
     for i in 0..HEAP_SIZE {
         let x = Box::new(i);
         assert_eq!(*x, i);
     }
-    assert_eq!(*long_lived, 1); // new
+    assert_eq!(*long_lived, 1);
+}
+#[test_case]
+fn huge_allocation() {
+    struct Huge {
+        data: [u8; 4096],
+        data2: [u32; 4096],
+    }
+    impl Huge {
+        fn len(&self) -> usize {
+            self.data.len() + self.data2.len()
+        }
+    }
+    let huge_value = Box::new(Huge {
+        data: [0; 4096],
+        data2: [0; 4096],
+    });
+    assert_eq!(huge_value.len(), 8192);
 }

@@ -14,7 +14,7 @@ const BLOCK_SIZES: &[usize] = &[8, 16, 32, 64, 128, 256, 512, 1024, 2048];
 /// The fixed size block allocator
 pub struct FixedSizeBlockAllocator {
     list_heads: [Option<&'static mut ListNode>; BLOCK_SIZES.len()],
-    fallback_allocator: linked_list_allocator::Heap, // TO DO : modify this to something made by you
+    fallback_allocator: linked_list_allocator::Heap,
 }
 
 impl FixedSizeBlockAllocator {
@@ -29,7 +29,12 @@ impl FixedSizeBlockAllocator {
     }
     /// Initialize the allocator with the given heap bounds
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
-        self.fallback_allocator.init(heap_start, heap_size);
+        // TO DO: Check if the conversion is correct
+        // there may be a bug
+        // Don't use the crate, instead use the linked_list_allocator
+        // built by you
+        self.fallback_allocator
+            .init(heap_start as *mut u8, heap_size);
     }
     /// Allocate a block of the given size using the fallback allocator
     fn fallback_alloc(&mut self, layout: Layout) -> *mut u8 {

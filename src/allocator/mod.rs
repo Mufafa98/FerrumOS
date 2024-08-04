@@ -58,7 +58,11 @@ pub fn init_heap(
     let page_range = {
         // Define the start and end of the heap
         let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
+        let heap_end = heap_start
+            + HEAP_SIZE
+                .try_into()
+                .expect("[Allocator]: Failed to fit usize into u64 in init_heap() method")
+            - 1u64;
         // Define the range of pages that map to the heap
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);

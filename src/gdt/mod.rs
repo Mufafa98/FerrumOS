@@ -38,8 +38,11 @@ lazy_static! {
         // Add the code and TSS segments to the GDT
         // The code segment is used for executing code
         // The TSS segment is used for task switching
-        let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
-        let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
+        let code_selector = gdt.append(Descriptor::kernel_code_segment());
+        let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
+        // TO DO: Remove the following line after checking the code is working
+        // let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
+        // let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
         (
             gdt,
             Selectors {
@@ -74,7 +77,8 @@ lazy_static! {
             // The stack is marked as unsafe because it is a static mutable reference
             // and the address of the stack is taken
             let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
-            let stack_end = stack_start + STACK_SIZE;
+            let stack_end = stack_start + STACK_SIZE.try_into()
+            .expect("[Allocator]: Failed to fit usize into u64 in TSS initialization(GDT)");
             stack_end
         };
         tss
