@@ -1,13 +1,18 @@
-mod colors;
-mod tests;
-use crate::drivers::vga::colors::*;
+//! Offers support for operations on the VGA memory
+
+use colors::*;
 use core::fmt;
-// use core::fmt::{self, Write};
 use lazy_static::lazy_static;
 use spin::Mutex;
-use volatile::Volatile;
+use volatile::*;
+
+mod colors;
+mod tests;
 
 lazy_static! {
+    /// A mutex protected static used for writing to the screen.
+    ///
+    /// It's main usage is in the print! and println! macros
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         color_code: ColorCode::new(Color::White, Color::Black),
@@ -15,11 +20,12 @@ lazy_static! {
     });
 }
 
+/// Prints to the STOUT trough the VGA interface
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!($($arg)*)));
 }
-
+/// Prints to the STOUT trough the VGA interface, appending a newline
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
@@ -38,27 +44,41 @@ pub fn _print(args: fmt::Arguments) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
+/// Represents a symbol that can be printed using
+/// the VGA buffer.
+///
+/// It has two fields thet represent the symbol's
+/// code and it's colors(foreground & background)
 pub struct ScreenChar {
     ascii_char: u8,
     color_code: ColorCode,
 }
 impl ScreenChar {
+    /// Returns the character stored in the ScreenChar
+    /// struct
     pub fn get_ascii_char(&self) -> char {
         char::from(self.ascii_char)
     }
 }
+/// Max number of lines that can be printed
 pub const BUFFER_HEIGHT: usize = 25;
+/// Max number of symbols per line that can be printed
 pub const BUFFER_WIDTH: usize = 80;
 
 #[repr(transparent)]
+/// Memory representation of what is shown on the screen
+/// as a grid of BUFFER_HEIGHT x BUFFER_WIDTH
 pub struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 impl Buffer {
-    pub fn get_char(&self, i: usize, j: usize) -> &Volatile<ScreenChar> {
-        &self.chars[i][j]
+    /// Retrives the character possitioned on
+    /// the row and column provided
+    pub fn get_char(&self, row: usize, col: usize) -> &Volatile<ScreenChar> {
+        &self.chars[row][col]
     }
 }
+/// Responsable for writing on the screen.
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
@@ -66,9 +86,14 @@ pub struct Writer {
 }
 
 impl Writer {
+    /// Returns the current stored buffer
+    ///
+    /// Mainly used for tests, may be removed in
+    /// future versions
     pub fn get_buffer(&mut self) -> &Buffer {
         self.buffer
     }
+    /// Writes a string into the buffer using write_byte()
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
@@ -77,6 +102,14 @@ impl Writer {
             }
         }
     }
+    /// Writes a byte into the buffer. The writing direction
+    /// is Left to Right and Bottom to Top
+    ///
+    /// Note that the only characters suported are
+    /// those present in Code page 437. Therefore
+    /// any other character that is not present in
+    /// this list will be replaced by the character
+    /// 0xfe
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -96,6 +129,8 @@ impl Writer {
             }
         }
     }
+    /// Moves all the rows up by one and clear the
+    /// bottom most row
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
@@ -106,6 +141,7 @@ impl Writer {
         self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
+    /// Clears a specified row
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_char: b' ',

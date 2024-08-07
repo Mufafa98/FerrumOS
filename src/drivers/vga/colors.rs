@@ -1,6 +1,8 @@
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+/// Enum that stores colors that may be used with
+/// the VGA driver
 pub enum Color {
     Black = 0,
     Blue = 1,
@@ -22,9 +24,12 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
+/// Type responsable with combining the foreground and background colors
 pub struct ColorCode(u8);
 
 impl ColorCode {
+    /// Create a new ColorCode object with coresponding
+    /// foreground and background
     pub fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }

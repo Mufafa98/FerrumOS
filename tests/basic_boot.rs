@@ -4,15 +4,11 @@
 #![test_runner(ferrum_os::utils::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-#[allow(unused_imports)]
-use core::panic::PanicInfo;
-#[allow(unused_imports)]
-use ferrum_os::utils::panic_module::panic;
+use bootloader::{entry_point, BootInfo};
+entry_point!(main);
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+fn main(_boot_info: &'static BootInfo) -> ! {
     test_main();
-
     ferrum_os::hlt_loop();
 }
 
