@@ -2,10 +2,6 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 use ansi_rgb::{green_cyan, Foreground};
-#[allow(unused_imports)]
-use core::panic::PanicInfo;
-#[allow(unused_imports)]
-use ferrum_os::utils::panic_module::panic;
 use ferrum_os::{serial_print, serial_println};
 
 use lazy_static::lazy_static;
@@ -39,8 +35,9 @@ pub fn init_test_idt() {
     TEST_IDT.load();
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+use bootloader::{entry_point, BootInfo};
+entry_point!(main);
+fn main(_boot_info: &'static BootInfo) -> ! {
     serial_print!("stack_overflow::stack_overflow...\t");
 
     ferrum_os::init();

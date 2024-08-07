@@ -4,13 +4,6 @@
 #![test_runner(ferrum_os::utils::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-#[allow(unused_imports)]
-use core::panic::PanicInfo;
-#[allow(unused_imports)]
-use ferrum_os::io::serial;
-#[allow(unused_imports)]
-use ferrum_os::utils::panic_module::panic;
-
 extern crate alloc;
 use bootloader::{entry_point, BootInfo};
 entry_point!(main);
