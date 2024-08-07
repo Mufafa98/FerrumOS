@@ -1,6 +1,5 @@
-//use drivers::{println, vga::*};
 #[cfg(test)]
-use crate::drivers::vga::{BUFFER_HEIGHT, WRITER};
+use super::{BUFFER_HEIGHT, WRITER};
 #[cfg(test)]
 use crate::println;
 
@@ -30,16 +29,4 @@ fn test_println_output() {
             assert_eq!(char::from(screen_char.ascii_char), c);
         }
     });
-
-    // old test => TO BE REMOVED
-    // let s = "Some test string that fits on a single line";
-    // println!("{}", s);
-    // for (i, c) in s.chars().enumerate() {
-    //     let screen_char = WRITER
-    //         .lock()
-    //         .get_buffer()
-    //         .get_char(BUFFER_HEIGHT - 2, i)
-    //         .read();
-    //     assert_eq!(screen_char.get_ascii_char(), c);
-    // }
 }

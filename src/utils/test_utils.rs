@@ -1,3 +1,5 @@
+use ansi_rgb::{green_cyan, Foreground};
+
 use super::qemu_utils::*;
 use crate::{serial_print, serial_println};
 pub trait Testable {
@@ -10,7 +12,7 @@ where
     fn run(&self) {
         serial_print!("{}...\t", core::any::type_name::<T>());
         self();
-        serial_println!("[ok]");
+        serial_println!("{}", "[ok]".fg(green_cyan()));
     }
 }
 
