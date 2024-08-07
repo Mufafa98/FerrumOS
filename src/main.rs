@@ -30,7 +30,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
 
-    // hlt_loop()
+    hlt_loop()
 }
 
 /// Temporary function used by example_task
