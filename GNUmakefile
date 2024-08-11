@@ -3,6 +3,12 @@ override MAKEFLAGS += -rR
 
 override IMAGE_NAME := ferrum_os
 
+override DISPLAY_TECH := -display sdl
+# Needed for serial output to work.
+override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio
+
+override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS)
+
 .PHONY: all
 all: $(IMAGE_NAME).iso
 
@@ -11,19 +17,19 @@ all-hdd: $(IMAGE_NAME).hdd
 
 .PHONY: run
 run: $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d --display sdl
+	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
 
 .PHONY: run-uefi
 run-uefi: ovmf $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d --display sdl
+	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
 
 .PHONY: run-hdd
 run-hdd: $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -hda $(IMAGE_NAME).hdd --display sdl
+	qemu-system-x86_64 -M q35 -m 2G -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
 
 .PHONY: run-hdd-uefi
 run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd --display sdl
+	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
 
 ovmf:
 	mkdir -p ovmf
