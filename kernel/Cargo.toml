@@ -31,3 +31,6 @@ default-features = false
 version = "0.3.4"
 default-features = false
 features = ["alloc"]
+
+[features]
+debug = []
