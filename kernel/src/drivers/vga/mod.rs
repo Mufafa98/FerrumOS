@@ -9,38 +9,40 @@ use volatile::*;
 mod colors;
 mod tests;
 
-lazy_static! {
-    /// A mutex protected static used for writing to the screen.
-    ///
-    /// It's main usage is in the print! and println! macros
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
+// lazy_static! {
+//     /// A mutex protected static used for writing to the screen.
+//     ///
+//     /// It's main usage is in the print! and println! macros
+//     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+//         column_position: 0,
+//         color_code: ColorCode::new(Color::White, Color::Black),
+//         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+//     });
+// }
 
-/// Prints to the STOUT trough the VGA interface
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!($($arg)*)));
-}
-/// Prints to the STOUT trough the VGA interface, appending a newline
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-#[doc(hidden)]
-pub fn _print(args: fmt::Arguments) {
-    use core::fmt::Write;
-    use x86_64::instructions::interrupts;
-    //disable interrupts while printing a message
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
-    });
-}
+// /// Prints to the STOUT trough the VGA interface
+// #[cfg(feature = "vga")]
+// #[macro_export]
+// macro_rules! print {
+//     ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!($($arg)*)));
+// }
+// /// Prints to the STOUT trough the VGA interface, appending a newline
+// #[cfg(feature = "vga")]
+// #[macro_export]
+// macro_rules! println {
+//     () => ($crate::print!("\n"));
+//     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+// }
+// #[cfg(feature = "vga")]
+// #[doc(hidden)]
+// pub fn _print(args: fmt::Arguments) {
+//     use core::fmt::Write;
+//     use x86_64::instructions::interrupts;
+//     //disable interrupts while printing a message
+//     interrupts::without_interrupts(|| {
+//         WRITER.lock().write_fmt(args).unwrap();
+//     });
+// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]

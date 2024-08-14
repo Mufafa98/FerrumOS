@@ -1,6 +1,7 @@
 //! Utils crate responsable with panic handlers, test utils
 //! and vm management
 
+pub mod custom_types;
 pub mod panic_module;
 mod qemu_utils;
 mod test_utils;

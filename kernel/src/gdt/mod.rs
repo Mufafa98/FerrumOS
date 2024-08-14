@@ -12,13 +12,15 @@ use x86_64::{
 };
 /// Initialize the GDT with the code and TSS segments
 pub fn init() {
-    use x86_64::instructions::segmentation::{Segment, CS};
+    use x86_64::instructions::segmentation::{Segment, CS, DS, SS};
     use x86_64::instructions::tables::load_tss;
     // Initialize the GDT
     GDT.0.load();
     unsafe {
         // Reload the code segment register
         CS::set_reg(GDT.1.code_selector);
+        DS::set_reg(GDT.1.data_selector);
+        SS::set_reg(GDT.1.data_selector);
         // Load the Task State Segment (TSS)
         load_tss(GDT.1.tss_selector);
     }
@@ -39,6 +41,7 @@ lazy_static! {
         // The code segment is used for executing code
         // The TSS segment is used for task switching
         let code_selector = gdt.append(Descriptor::kernel_code_segment());
+        let data_selector = gdt.append(Descriptor::kernel_data_segment());
         let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
         // TO DO: Remove the following line after checking the code is working
         // let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
@@ -47,6 +50,7 @@ lazy_static! {
             gdt,
             Selectors {
                 code_selector,
+                data_selector,
                 tss_selector,
             },
         )
@@ -56,6 +60,7 @@ lazy_static! {
 /// in the GDT
 struct Selectors {
     code_selector: SegmentSelector,
+    data_selector: SegmentSelector,
     tss_selector: SegmentSelector,
 }
 

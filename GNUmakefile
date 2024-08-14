@@ -5,9 +5,11 @@ override IMAGE_NAME := ferrum_os
 
 override DISPLAY_TECH := -display sdl
 # Needed for serial output to work.
-override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio
+override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio 
 
-override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS)
+override INTERRUPT_PARAMS := -d int -D qemu_interrupts.log
+
+override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) 
 
 .PHONY: all
 all: $(IMAGE_NAME).iso
