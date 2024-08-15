@@ -2,14 +2,11 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::serial_println;
-
 use super::super::framebuffer::FRAMEBUFFER;
 use super::psf_font::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;
 pub struct TextWriter {
     x_position: u64,
-    y_position: u64,
     fg_color: Color,
     bg_color: Color,
     font: PsfFont,
@@ -21,7 +18,6 @@ impl TextWriter {
 
         TextWriter {
             x_position: 0,
-            y_position: 0,
             fg_color: Color::new(255, 255, 255, 255),
             bg_color: Color::new(0, 122, 1, 1),
             font,
@@ -42,7 +38,7 @@ impl TextWriter {
                     - (self.font.get_height() * self.font_size_multiplier) as u64;
                 let col = self.x_position;
                 self.font.display_char(
-                    character,
+                    normal_char,
                     &FRAMEBUFFER,
                     (col, row),
                     self.fg_color.to_u32(),
@@ -111,7 +107,7 @@ impl Color {
 }
 
 lazy_static! {
-    pub static ref TEXT_WRITER: Mutex<TextWriter> = { Mutex::new(TextWriter::new()) };
+    pub static ref TEXT_WRITER: Mutex<TextWriter> = Mutex::new(TextWriter::new());
 }
 
 /// Prints to the STOUT trough the framebuffer interface
@@ -131,7 +127,6 @@ macro_rules! println {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
-    serial_println!("_print");
     //disable interrupts while printing a message
     interrupts::without_interrupts(|| {
         TEXT_WRITER.lock().write_fmt(args).unwrap();

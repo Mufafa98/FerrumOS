@@ -11,6 +11,8 @@ override INTERRUPT_PARAMS := -d int -D qemu_interrupts.log
 
 override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) 
 
+.SILENT: all all-hdd run run-uefi run-hdd run-hdd-uefi check ovmf limine kernel $(IMAGE_NAME).iso $(IMAGE_NAME).hdd clean distclean
+
 .PHONY: all
 all: $(IMAGE_NAME).iso
 
@@ -32,6 +34,10 @@ run-hdd: $(IMAGE_NAME).hdd
 .PHONY: run-hdd-uefi
 run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
 	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
+
+.PHONY: check
+check:
+	$(MAKE) -C kernel check
 
 ovmf:
 	mkdir -p ovmf

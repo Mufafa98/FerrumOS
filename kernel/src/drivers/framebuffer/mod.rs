@@ -1,7 +1,8 @@
 use crate::utils::custom_types::mut_u8_ptr::MutU8Ptr;
 use lazy_static::lazy_static;
-use limine::{framebuffer::Framebuffer, request::FramebufferRequest};
-
+use limine::request::FramebufferRequest;
+#[used]
+#[link_section = ".requests"]
 static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
 
 lazy_static! {

@@ -1,6 +1,3 @@
-use lazy_static::lazy_static;
-use psf_font::PsfFont;
-
 pub mod psf_font;
 pub mod text_writer;
 

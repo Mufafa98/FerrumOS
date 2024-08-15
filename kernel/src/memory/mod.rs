@@ -1,7 +1,7 @@
 //! Memory management module
 // use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
 // TO DO : check if equivalent
-use limine::memory_map::{self, Entry, EntryType};
+use limine::memory_map::{Entry, EntryType};
 use limine::request::MemoryMapRequest;
 use x86_64::{
     structures::paging::{
@@ -9,6 +9,8 @@ use x86_64::{
     },
     PhysAddr, VirtAddr,
 };
+#[used]
+#[link_section = ".requests"]
 static MEMORY_MAP_REQUEST: MemoryMapRequest = MemoryMapRequest::new();
 use lazy_static::lazy_static;
 lazy_static! {
@@ -88,24 +90,6 @@ impl BootInfoFrameAllocator {
     }
     /// Create a new FrameAllocator from the passed memory map.
     pub unsafe fn init() -> Self {
-        // for i in 0..memory_map.len {
-        // let tp = match memory_map.ptr.add(i).as_ref().unwrap().entry_type {
-        //     EntryType::USABLE => "USABLE",
-        //     EntryType::RESERVED => "RESERVED",
-        //     EntryType::ACPI_RECLAIMABLE => "ACPI_RECLAIMABLE",
-        //     EntryType::ACPI_NVS => "ACPI_NVS",
-        //     EntryType::BAD_MEMORY => "BAD",
-        //     EntryType::BOOTLOADER_RECLAIMABLE => "BOOTLOADER_RECLAIMABLE",
-        //     EntryType::KERNEL_AND_MODULES => "KERNEL_AND_MODULES",
-        //     EntryType::FRAMEBUFFER => "FRAMEBUFFER",
-        //     _ => "UNKNOWN",
-        // };
-        // serial_println!(
-        //     "[NEW] region: {:x} entry type: {:?}",
-        //     memory_map.ptr.add(i).as_ref().unwrap().base,
-        //     tp
-        // );
-        // }
         BootInfoFrameAllocator {
             // memory_map: MEMORY_REGIONS.,
             next: 0,
@@ -142,72 +126,4 @@ pub fn create_example_mapping(
         mapper.map_to(page, frame, flags, frame_allocator)
     };
     map_to_result.expect("map_to failed").flush();
-}
-
-//
-//
-
-///
-/// /
-// to document
-use core::slice;
-
-use crate::{io::serial, serial_println};
-pub struct Entries {
-    ptr: *mut Entry,
-    len: usize,
-}
-
-impl Iterator for Entries {
-    type Item = Entry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.len > 0 {
-            let entry = unsafe { self.ptr.read() };
-            self.ptr = unsafe { self.ptr.add(1) };
-            self.len -= 1;
-            Some(entry)
-        } else {
-            None
-        }
-    }
-}
-
-unsafe impl Sync for Entries {}
-unsafe impl Send for Entries {}
-
-impl Entries {
-    pub fn new(entries: &[&Entry]) -> Self {
-        Entries {
-            ptr: entries.as_ptr() as *mut Entry,
-            len: entries.len(),
-        }
-    }
-}
-impl core::ops::Deref for Entries {
-    type Target = [Entry];
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { slice::from_raw_parts(self.ptr, self.len) }
-    }
-}
-
-impl core::ops::DerefMut for Entries {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { slice::from_raw_parts_mut(self.ptr, self.len) }
-    }
-}
-impl From<&'static mut [Entry]> for Entries {
-    fn from(regions: &'static mut [Entry]) -> Self {
-        Entries {
-            ptr: regions.as_mut_ptr(),
-            len: regions.len(),
-        }
-    }
-}
-
-impl From<Entries> for &'static mut [Entry] {
-    fn from(regions: Entries) -> &'static mut [Entry] {
-        unsafe { slice::from_raw_parts_mut(regions.ptr, regions.len) }
-    }
 }

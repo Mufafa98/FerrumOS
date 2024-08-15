@@ -22,12 +22,17 @@ pub mod utils;
 pub mod task;
 //--------------------------------------
 use limine::{
-    memory_map::Entry,
-    request::{HhdmRequest, KernelAddressRequest, MemoryMapRequest},
+    request::{HhdmRequest, KernelAddressRequest},
     BaseRevision,
 };
+#[used]
+#[link_section = ".requests"]
 static BASE_REVISION: BaseRevision = BaseRevision::new();
+#[used]
+#[link_section = ".requests"]
 static KERNEL_ADDRESS_REQUEST: KernelAddressRequest = KernelAddressRequest::new();
+#[used]
+#[link_section = ".requests"]
 static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 // TO SOLVE
 // #[cfg(test)]
@@ -37,7 +42,13 @@ static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 pub fn init() {
     gdt::init();
     interrupts::init_idt();
-    unsafe { interrupts::PICS.lock().initialize() };
+    unsafe {
+        interrupts::PICS.lock().initialize();
+        // TO DO : Type to faciliatte creation of the mask
+        // here we are masking the first 2 interrupts
+        // wich are the timer and the keyboard
+        interrupts::PICS.lock().write_masks(0b11111100, 255);
+    };
     x86_64::instructions::interrupts::enable();
 
     // Mem init

@@ -1,7 +1,5 @@
 use alloc::vec::Vec;
 
-use crate::{serial_print, serial_println};
-
 #[derive(Debug)]
 #[repr(C)]
 pub struct Glyphs {
@@ -25,18 +23,11 @@ impl Glyphs {
         let unicode_data = &data[(glyphs_number * glyphs_size) as usize..];
         let mut hex_buffer: [u8; 4] = [0; 4];
         let mut hex_buffer_index = 0;
-        // counter = 0;
         let mut unicode_result: Vec<u32> = Vec::new();
         for element in unicode_data.iter() {
             if *element == 0xff {
-                #[cfg(feature = "debug")]
-                serial_print!("\n");
-                if let Some(unicode) = Self::get_utf8(&hex_buffer, hex_buffer_index) {
+                if let Some(unicode) = Self::get_utf8(&hex_buffer) {
                     unicode_result.push(unicode);
-                    // result.unicode[counter] = unicode;
-                    // counter += 1;
-                    #[cfg(feature = "debug")]
-                    serial_print!("unicode: {:?}\n", char::from_u32(unicode));
                 }
 
                 hex_buffer = [0; 4];
@@ -63,14 +54,9 @@ impl Glyphs {
         self.unicode[index]
     }
 
-    pub fn get_utf8(data: &[u8; 4], size: usize) -> Option<u32> {
-        #[cfg(feature = "debug")]
-        for i in 0..size {
-            serial_print!("{:x} ", data[i]);
-        }
+    pub fn get_utf8(data: &[u8; 4]) -> Option<u32> {
         if data[0] & 0b11110000 == 0b11110000 {
-            #[cfg(feature = "debug")]
-            serial_print!("4 bytes entry ");
+            // 4 bytes entry
             let b1_data: u32 = (data[0] & 0b00000111).into();
             let b2_data: u32 = (data[1] & 0b00111111).into();
             let b3_data: u32 = (data[2] & 0b00111111).into();
@@ -78,32 +64,27 @@ impl Glyphs {
             let result = (b1_data << 18) | (b2_data << 12) | (b3_data << 6) | b4_data;
             Some(result)
         } else if data[0] & 0b11100000 == 0b11100000 {
-            #[cfg(feature = "debug")]
-            serial_print!("3 bytes entry ");
+            // 3 bytes entry
             let b1_data: u32 = (data[0] & 0b00001111).into();
             let b2_data: u32 = (data[1] & 0b00111111).into();
             let b3_data: u32 = (data[2] & 0b00111111).into();
             let result: u32 = (b1_data << 12) | (b2_data << 6) | b3_data;
             Some(result)
         } else if data[0] & 0b11000000 == 0b11000000 {
-            #[cfg(feature = "debug")]
-            serial_print!("2 bytes entry ");
+            // 2 bytes entry
             let b1_data: u32 = (data[0] & 0b00011111).into();
             let b2_data: u32 = (data[1] & 0b00111111).into();
             let result: u32 = (b1_data << 6) | b2_data;
             Some(result)
         } else if data[0] & 0b00000000 == 0b00000000 {
-            #[cfg(feature = "debug")]
-            serial_print!("1 byte entry ");
+            // Single byte
             let result: u32 = data[0] as u32;
             Some(result)
         } else if data[0] & 0b10000000 == 0b10000000 {
-            #[cfg(feature = "debug")]
-            serial_print!("continuation byte\n");
+            // Continuation byte
             None
         } else {
-            #[cfg(feature = "debug")]
-            serial_print!("error\n");
+            // Error
             None
         }
     }

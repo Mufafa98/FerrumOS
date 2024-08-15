@@ -42,7 +42,6 @@ fn align_up(addr: usize, align: usize) -> usize {
 
 use fixed_size_block::FixedSizeBlockAllocator;
 
-use crate::serial_println;
 #[global_allocator]
 /// The global allocator struct.
 static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
@@ -72,7 +71,6 @@ pub fn init_heap(
     };
     // Map each page to a frame
     for page in page_range {
-        // serial_println!("Mapping page {:?} to frame", page);
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;

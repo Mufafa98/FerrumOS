@@ -1,5 +1,5 @@
 use super::super::framebuffer::FrameBuffer;
-use crate::{serial_print, serial_println};
+// use crate::serial_println;
 use glyph::Glyphs;
 mod glyph;
 
@@ -78,30 +78,14 @@ impl PsfFont {
         }
     }
 
-    // fn display_glyphs_old(glymph: [u8; 16], framebuffer: &Framebuffer, position: (u64, u64)) {
-    //     let mut position = position;
-    //     for row in 0..16_u64 {
-    //         for col in 0..8_u64 {
-    //             let bit = glymph[row as usize] & (1 << (7 - col));
-    //             if bit != 0 {
-    //                 let pixel_coord = (position.0 + col, position.1 + row);
-    //                 let pixel_offset = pixel_coord.1 * framebuffer.pitch() + pixel_coord.0 * 4;
-    //                 unsafe {
-    //                     *(framebuffer.addr().add(pixel_offset as usize) as *mut u32) = 0x00FFFFFF;
-    //                 }
-    //             }
+    // fn print_glyphs_debug(&self) {
+    //     for j in 0..self.numglyph {
+    //         let start = (j * 16) as usize;
+    //         for i in start..(start + 16) {
+    //             serial_println!("{:0wd$b}", self.glyphs.get_glyph(j as usize)[i], wd = 8);
     //         }
     //     }
     // }
-
-    fn print_glyphs_debug(&self) {
-        for j in 0..self.numglyph {
-            let start = (j * 16) as usize;
-            for i in start..(start + 16) {
-                serial_println!("{:0wd$b}", self.glyphs.get_glyph(j as usize)[i], wd = 8);
-            }
-        }
-    }
 
     fn get_glyph(&self, index: u32) -> [u8; 16] {
         let mut glyph = [0; 16];

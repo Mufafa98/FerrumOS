@@ -1,9 +1,10 @@
 //! Offers support for operations on the VGA memory
-
+//! Deprecated in favor of the frame buffer
+//! Might be removed in future versions
 use colors::*;
 use core::fmt;
-use lazy_static::lazy_static;
-use spin::Mutex;
+// use lazy_static::lazy_static;
+// use spin::Mutex;
 use volatile::*;
 
 mod colors;

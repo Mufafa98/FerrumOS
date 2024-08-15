@@ -30,6 +30,7 @@ pub struct ColorCode(u8);
 impl ColorCode {
     /// Create a new ColorCode object with coresponding
     /// foreground and background
+    #[allow(dead_code)]
     pub fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
