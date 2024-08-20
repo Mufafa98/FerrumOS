@@ -1,3 +1,4 @@
+//! Fonts module.
 pub mod psf_font;
 pub mod text_writer;
 

@@ -1,8 +1,9 @@
+//! This module contains the implementation of the PsfFont struct,
+//! which is used to represent a font in the PSF format.
 use super::super::framebuffer::FrameBuffer;
-// use crate::serial_println;
 use glyph::Glyphs;
 mod glyph;
-
+/// PsfFont struct containing the font data
 #[derive(Debug)]
 #[repr(C)]
 pub struct PsfFont {
@@ -18,6 +19,9 @@ pub struct PsfFont {
 }
 
 impl PsfFont {
+    /// Creates a new PsfFont from the given data
+    ///
+    /// Note: More general implementation needed
     pub fn from(data: &[u8]) -> Self {
         let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
         let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
@@ -42,14 +46,15 @@ impl PsfFont {
 
         result
     }
-
+    /// Gets the height of the font
     pub fn get_height(&self) -> u32 {
         self.height
     }
+    /// Gets the width of the font
     pub fn get_width(&self) -> u32 {
         self.width
     }
-
+    /// Displays a character on the framebuffer at the given position with the given colors
     pub fn display_char(
         &self,
         character: char,
@@ -77,16 +82,7 @@ impl PsfFont {
             }
         }
     }
-
-    // fn print_glyphs_debug(&self) {
-    //     for j in 0..self.numglyph {
-    //         let start = (j * 16) as usize;
-    //         for i in start..(start + 16) {
-    //             serial_println!("{:0wd$b}", self.glyphs.get_glyph(j as usize)[i], wd = 8);
-    //         }
-    //     }
-    // }
-
+    /// Gets the glyph data for the given index
     fn get_glyph(&self, index: u32) -> [u8; 16] {
         let mut glyph = [0; 16];
         for i in 0..16 {
@@ -94,6 +90,7 @@ impl PsfFont {
         }
         glyph
     }
+    /// Finds the glyph for the given unicode
     fn find_glyph(&self, unicode: u32) -> Option<[u8; 16]> {
         for i in 0..self.numglyph {
             if self.glyphs.get_unicode(i as usize) == unicode {

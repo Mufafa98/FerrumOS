@@ -1,26 +1,48 @@
 #![no_std]
 #![no_main]
 
+use alloc::{
+    fmt::format,
+    format,
+    string::{String, ToString},
+};
 use ferrum_os::*;
 
 use task::{executor, keyboard, Task};
 
 extern crate alloc;
 
+#[cfg(test)]
+pub fn test_runner(tests: &[&dyn Fn()]) {
+    serial_println!("Running {} tests", tests.len());
+    for test in tests {
+        test();
+    }
+}
 #[no_mangle]
 unsafe extern "C" fn _start() -> ! {
-    serial_println!("<-------------------->\n FerrumOs has started\n<-------------------->");
     ferrum_os::init();
-    // loop {
-    //     print!("-");
-    // }
-    println!("Hello World from println macro!");
-    println!("Hello World from Again macro!");
+    let title = "FerrumOs has started";
+    let separator = "-".repeat(title.len());
+    let mut features = "".to_string();
+    #[cfg(feature = "test")]
+    features.push_str("\n Test");
+    #[cfg(not(feature = "test"))]
+    features.push_str("\n Default");
+    serial_println!(
+        "<{separator}>\n {} \n [Features]:{} \n<{separator}>",
+        title,
+        features,
+        separator = "-".repeat(title.len())
+    );
     let mut executor = executor::Executor::new();
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
-    // hlt_loop();
 }
+// #[test_case]
+// fn trivial_assertion() {
+//     assert_eq!(1, 1);
+// }
 #[allow(dead_code)]
 fn heap_test_debug() {
     use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
@@ -46,4 +68,9 @@ fn heap_test_debug() {
         "reference count is {} now",
         Rc::strong_count(&cloned_reference)
     );
+}
+// TO DO : Throw error when stack overflow
+fn inf_rec() {
+    inf_rec();
+    x86_64::instructions::hlt();
 }

@@ -1,5 +1,7 @@
+//! This module contains the implementation of the Glyphs struct,
+//! which is used to represent the glyphs in a font.
 use alloc::vec::Vec;
-
+/// Glyphs struct containing the unicode and glyph data
 #[derive(Debug)]
 #[repr(C)]
 pub struct Glyphs {
@@ -8,23 +10,35 @@ pub struct Glyphs {
 }
 
 impl Glyphs {
+    /// Creates a new Glyphs struct from the given data
     pub fn new(data: &[u8], glyphs_number: u32, glyphs_size: u32) -> Self {
         let mut glyphs_result: Vec<Vec<u8>> = Vec::new();
+        // The bitmap for the character is stored in the data array
+        // witch is located in the given data array from
+        // 0 to (glyphs_number * glyphs_size)
         let glyph_data = &data[0..(glyphs_number * glyphs_size) as usize];
         let mut glyph_result: Vec<u8> = Vec::new();
         for element in glyph_data.iter() {
+            // Each glyph is 16 bytes long
+            // TO DO: Make this more general
             if glyph_result.len() == 16 {
                 glyphs_result.push(glyph_result);
                 glyph_result = Vec::new();
             }
             glyph_result.push(*element);
         }
-
+        // The unicode data is stored in the data array
+        // witch is located in the given data array from
+        // (glyphs_number * glyphs_size) to the end
         let unicode_data = &data[(glyphs_number * glyphs_size) as usize..];
+        // Parse the unicode data
+        // TO DO: Improve this using vec
         let mut hex_buffer: [u8; 4] = [0; 4];
         let mut hex_buffer_index = 0;
         let mut unicode_result: Vec<u32> = Vec::new();
         for element in unicode_data.iter() {
+            // If the element is 0xff, then the unicode data
+            // for the current glyph is finished
             if *element == 0xff {
                 if let Some(unicode) = Self::get_utf8(&hex_buffer) {
                     unicode_result.push(unicode);
@@ -45,15 +59,15 @@ impl Glyphs {
             glyph: glyphs_result,
         }
     }
-
+    /// Gets the glyph data for the given index
     pub fn get_glyph(&self, index: usize) -> &Vec<u8> {
         &self.glyph[index]
     }
-
+    /// Gets the unicode data for the given index
     pub fn get_unicode(&self, index: usize) -> u32 {
         self.unicode[index]
     }
-
+    /// Converts a 4 byte array to a u32 utf8 value
     pub fn get_utf8(data: &[u8; 4]) -> Option<u32> {
         if data[0] & 0b11110000 == 0b11110000 {
             // 4 bytes entry

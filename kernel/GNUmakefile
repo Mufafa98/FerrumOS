@@ -11,6 +11,15 @@ all:
 check:
 	cargo check --target x86_64-unknown-none
 
+.PHONY: doc
+doc:
+	cargo doc --target x86_64-unknown-none
+
+.PHONY: test
+test:
+	cargo build --target x86_64-unknown-none --features test
+	cp target/x86_64-unknown-none/debug/ferrum_os kernel.elf
+
 # Remove object files and the final executable.
 .PHONY: clean
 clean:

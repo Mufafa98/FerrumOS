@@ -38,6 +38,30 @@ run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
 .PHONY: check
 check:
 	$(MAKE) -C kernel check
+.PHONY: doc
+doc:
+	$(MAKE) -C kernel doc
+
+.PHONY: run-test
+run-test: $(IMAGE_NAME).iso.test
+	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
+
+$(IMAGE_NAME).iso.test: limine test
+	rm -rf iso_root
+	mkdir -p iso_root
+	cp kernel/kernel.elf \
+		limine.cfg limine/limine.sys limine/limine-cd.bin limine/limine-cd-efi.bin iso_root/
+	xorriso -as mkisofs -b limine-cd.bin \
+		-no-emul-boot -boot-load-size 4 -boot-info-table \
+		--efi-boot limine-cd-efi.bin \
+		-efi-boot-part --efi-boot-image --protective-msdos-label \
+		iso_root -o $(IMAGE_NAME).iso
+	limine/limine-deploy $(IMAGE_NAME).iso
+	rm -rf iso_root
+
+.PHONY: test
+test:
+	$(MAKE) -C kernel test
 
 ovmf:
 	mkdir -p ovmf

@@ -1,3 +1,4 @@
+//! This module contains the implementation of a text writer that writes to the framebuffer
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -5,6 +6,8 @@ use spin::Mutex;
 use super::super::framebuffer::FRAMEBUFFER;
 use super::psf_font::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;
+
+/// Text writer struct containing the current position, colors, font and font size multiplier
 pub struct TextWriter {
     x_position: u64,
     fg_color: Color,
@@ -13,6 +16,7 @@ pub struct TextWriter {
     font_size_multiplier: u32,
 }
 impl TextWriter {
+    /// Creates a new text writer
     pub fn new() -> Self {
         let font = PsfFont::from(DEFAULT_FONT_DATA_BYTES);
 
@@ -24,6 +28,7 @@ impl TextWriter {
             font_size_multiplier: 1,
         }
     }
+    /// Writes a character to the framebuffer
     pub fn write_char(&mut self, character: char) {
         match character {
             '\n' => {
@@ -31,11 +36,14 @@ impl TextWriter {
                 return;
             }
             normal_char => {
+                // Check if we reached the end of the screen
                 if self.x_position > FRAMEBUFFER.get_width() {
                     self.write_newline();
                 }
+                // Set the row at the bottom of the screen
                 let row = FRAMEBUFFER.get_height()
                     - (self.font.get_height() * self.font_size_multiplier) as u64;
+                // Set the column at the current x position
                 let col = self.x_position;
                 self.font.display_char(
                     normal_char,
@@ -45,19 +53,26 @@ impl TextWriter {
                     self.bg_color.to_u32(),
                     self.font_size_multiplier as u64,
                 );
+                // Move the x position to the right
                 self.x_position += (self.font.get_width() * self.font_size_multiplier) as u64;
             }
         }
     }
+    /// Writes a string to the framebuffer
     pub fn write_string(&mut self, string: &str) {
         for character in string.chars() {
             self.write_char(character);
         }
     }
+    /// Writes a newline to the framebuffer
+    /// This function moves all the rows up by the height of a character
+    // TO DO : Optimize this function
     fn write_newline(&mut self) {
+        // Get the height of a character
         let char_height = (self.font.get_height() * self.font_size_multiplier) as u64;
         for row in char_height..FRAMEBUFFER.get_height() {
             for col in 0..FRAMEBUFFER.get_width() {
+                // Move all the rows up by the height of a character
                 let pixel = FRAMEBUFFER.get_pixel(col, row);
                 if pixel == self.fg_color.to_u32() || pixel == self.bg_color.to_u32() {
                     FRAMEBUFFER.put_pixel(col, row - char_height, pixel);
@@ -67,6 +82,8 @@ impl TextWriter {
         self.clear_row(FRAMEBUFFER.get_height() - char_height);
         self.x_position = 0;
     }
+    /// Clears a row of the framebuffer
+    // TO DO : Optimize this function
     fn clear_row(&mut self, row_start: u64) {
         for row in row_start..FRAMEBUFFER.get_height() {
             for col in 0..FRAMEBUFFER.get_width() {
@@ -89,7 +106,7 @@ impl fmt::Write for TextWriter {
         Ok(())
     }
 }
-
+/// Color struct containing the red, green, blue and alpha values
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -98,15 +115,18 @@ pub struct Color {
 }
 
 impl Color {
+    /// Creates a new color with the given red, green, blue and alpha values
     pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Color { r, g, b, a }
     }
+    /// Converts the color to a u32 value
     pub fn to_u32(&self) -> u32 {
         ((self.a as u32) << 24) | ((self.r as u32) << 16) | ((self.g as u32) << 8) | (self.b as u32)
     }
 }
 
 lazy_static! {
+    /// Text writer global instance
     pub static ref TEXT_WRITER: Mutex<TextWriter> = Mutex::new(TextWriter::new());
 }
 

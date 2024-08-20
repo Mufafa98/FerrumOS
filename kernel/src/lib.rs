@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 // TO SOLVE
-#![feature(custom_test_frameworks)]
+// #![feature(custom_test_frameworks)]
 // #![test_runner(utils::test_runner)]
 // #![reexport_test_harness_main = "test_main"]
 #![feature(const_mut_refs)]
@@ -16,7 +16,6 @@ pub mod gdt;
 pub mod interrupts;
 pub mod io;
 pub mod memory;
-pub mod tests;
 pub mod utils;
 //maybe refactor in multiTasking or sth?
 pub mod task;
@@ -67,16 +66,15 @@ pub fn hlt_loop() -> ! {
     }
 }
 
-// TO SOLVE
 // #[cfg(test)]
-// use bootloader_api::{entry_point, BootInfo};
-
-// #[cfg(test)]
-// entry_point!(test_kernel_main);
-
-// #[cfg(test)]
-// fn test_kernel_main(_boot_info: &'static mut BootInfo) -> ! {
-//     init();
+// #[no_mangle]
+// unsafe extern "C" fn _start() -> ! {
+//     // init();
 //     test_main();
-//     hlt_loop();
+//     // hlt_loop();
+//     loop {}
+// }
+// #[test_case]
+// fn trivial_assertion() {
+//     assert_eq!(1, 1);
 // }
