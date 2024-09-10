@@ -19,6 +19,8 @@ pub mod memory;
 pub mod utils;
 //maybe refactor in multiTasking or sth?
 pub mod task;
+pub mod timer;
+// use lazy_static::lazy_static;
 //--------------------------------------
 use limine::{
     request::{HhdmRequest, KernelAddressRequest},
@@ -32,7 +34,7 @@ static BASE_REVISION: BaseRevision = BaseRevision::new();
 static KERNEL_ADDRESS_REQUEST: KernelAddressRequest = KernelAddressRequest::new();
 #[used]
 #[link_section = ".requests"]
-static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
+pub static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 // TO SOLVE
 // #[cfg(test)]
 // use utils::test_runner;
@@ -41,18 +43,19 @@ static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
 pub fn init() {
     gdt::init();
     interrupts::init_idt();
-    unsafe {
-        interrupts::PICS.lock().initialize();
-        // TO DO : Type to faciliatte creation of the mask
-        // here we are masking the first 2 interrupts
-        // wich are the timer and the keyboard
-        interrupts::PICS.lock().write_masks(0b11111100, 255);
-    };
+    // unsafe {
+    //     interrupts::PICS.lock().initialize();
+    //     // TO DO : Type to faciliatte creation of the mask
+    //     // here we are masking the first 2 interrupts
+    //     // wich are the timer and the keyboard
+    //     interrupts::PICS.lock().write_masks(0b11111100, 255);
+    // };
+    // unsafe { interrupts::PICS.lock().disable() };
     x86_64::instructions::interrupts::enable();
-
     // Mem init
     use memory::BootInfoFrameAllocator;
     use x86_64::VirtAddr;
+
     let phys_base = HHDM_REQUEST.get_response().unwrap().offset();
     let phys_mem_offset = VirtAddr::new(phys_base);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };

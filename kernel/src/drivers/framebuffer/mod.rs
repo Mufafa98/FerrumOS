@@ -1,5 +1,5 @@
 //! Framebuffer driver for drawing on the screen.
-use crate::utils::custom_types::mut_u8_ptr::MutU8Ptr;
+use crate::{serial_println, utils::custom_types::mut_u8_ptr::MutU8Ptr};
 use lazy_static::lazy_static;
 use limine::request::FramebufferRequest;
 #[used]
@@ -29,6 +29,15 @@ impl FrameBuffer {
         if let Some(framebuffer_response) = FRAMEBUFFER_REQUEST.get_response() {
             // Get the first framebuffer.
             // TO DO : Handle multiple framebuffers.
+            serial_println!(
+                "Framebuffers found: {:?}",
+                framebuffer_response.framebuffers().count()
+            );
+            serial_println!(
+                "Framebuffer size: {} {}",
+                framebuffer_response.framebuffers().next().unwrap().width(),
+                framebuffer_response.framebuffers().next().unwrap().height()
+            );
             if let Some(framebuffer) = framebuffer_response.framebuffers().next() {
                 return Ok(FrameBuffer {
                     buffer: MutU8Ptr::new(framebuffer.addr()),
@@ -58,6 +67,7 @@ impl FrameBuffer {
     /// Gets a pixel from the screen at the given coordinates.
     pub fn get_pixel(&self, x: u64, y: u64) -> u32 {
         let pixel_offset = y * self.pitch + x * 4;
+        // unsafe { *(self.buffer.add((y * self.pitch + x * 4) as usize)) as *mut u32 }
         unsafe { *(self.buffer.add(pixel_offset as usize) as *mut u32) }
     }
     /// Gets a pixel from the screen at the given coordinates.

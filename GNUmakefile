@@ -2,8 +2,10 @@
 override MAKEFLAGS += -rR
 
 override IMAGE_NAME := ferrum_os
-
-override DISPLAY_TECH := -display sdl
+# OLD sdl / gtk
+# VGA options cirrus / std / vmware / qxl  
+# Resolution -g 
+override DISPLAY_TECH := -display gtk -vga vmware 
 # Needed for serial output to work.
 override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio 
 
