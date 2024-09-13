@@ -29,15 +29,15 @@ impl FrameBuffer {
         if let Some(framebuffer_response) = FRAMEBUFFER_REQUEST.get_response() {
             // Get the first framebuffer.
             // TO DO : Handle multiple framebuffers.
-            serial_println!(
-                "Framebuffers found: {:?}",
-                framebuffer_response.framebuffers().count()
-            );
-            serial_println!(
-                "Framebuffer size: {} {}",
-                framebuffer_response.framebuffers().next().unwrap().width(),
-                framebuffer_response.framebuffers().next().unwrap().height()
-            );
+            // serial_println!(
+            //     "Framebuffers found: {:?}",
+            //     framebuffer_response.framebuffers().count()
+            // );
+            // serial_println!(
+            //     "Framebuffer size: {} {}",
+            //     framebuffer_response.framebuffers().next().unwrap().width(),
+            //     framebuffer_response.framebuffers().next().unwrap().height()
+            // );
             if let Some(framebuffer) = framebuffer_response.framebuffers().next() {
                 return Ok(FrameBuffer {
                     buffer: MutU8Ptr::new(framebuffer.addr()),

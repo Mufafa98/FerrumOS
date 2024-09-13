@@ -61,6 +61,10 @@ pub fn init() {
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init() };
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+
+    use drivers::apic::{io_apic, local_apic};
+    local_apic::init();
+    io_apic::init();
 }
 /// Performant empty loop thet saves cpu time
 pub fn hlt_loop() -> ! {

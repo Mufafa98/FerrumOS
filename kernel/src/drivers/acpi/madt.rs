@@ -1,6 +1,5 @@
 use super::ACPISDTHeader;
-use crate::drivers::apic::io_apic::IOAPIC;
-use crate::println;
+use crate::drivers::apic::io_apic::IOAPICStruct;
 use alloc::vec::Vec;
 #[allow(dead_code)]
 enum MADTEntry {
@@ -54,7 +53,6 @@ pub struct MADT {
     entries_offset: u32,
     entries: Vec<MADTEntry>,
 }
-use core::ptr;
 impl MADT {
     pub fn new(base_ptr: u32) -> Self {
         use core::ptr;
@@ -135,7 +133,7 @@ impl MADT {
                 }
                 _ => {
                     entries_offset += record_length as u32;
-                    println!("Unknown Entry Type In MADT Table: {}", entry_type);
+                    // println!("Unknown Entry Type In MADT Table: {}", entry_type);
                 }
             }
             if record_length as u32 > left_to_read {
@@ -156,7 +154,7 @@ impl MADT {
             entries,
         }
     }
-    pub fn get_ioapic(&self) -> Option<IOAPIC> {
+    pub fn get_ioapic(&self) -> Option<IOAPICStruct> {
         for entry in self.entries.iter() {
             match entry {
                 MADTEntry::IoApicEntry {
@@ -164,7 +162,7 @@ impl MADT {
                     ioapic_address,
                     global_system_interrupt_base,
                 } => {
-                    return Some(IOAPIC::new(
+                    return Some(IOAPICStruct::new(
                         *ioapic_id,
                         *ioapic_address,
                         *global_system_interrupt_base,

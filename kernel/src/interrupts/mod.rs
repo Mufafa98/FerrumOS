@@ -48,14 +48,16 @@ mod tests;
 #[repr(u8)]
 pub enum InterruptIndexAPIC {
     Timer = 32,
-    Spurious,
+    LAPICTimer,
+    Keyboard,
+    Spurious = 0xFF,
 }
 impl InterruptIndexAPIC {
-    fn as_u8(self) -> u8 {
+    pub fn as_u8(self) -> u8 {
         self as u8
     }
-    fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
+    pub fn as_u32(self) -> u32 {
+        u32::from(self.as_u8())
     }
 }
 
@@ -92,11 +94,13 @@ lazy_static! {
         idt.debug.set_handler_fn(debug_handler);
         idt.overflow.set_handler_fn(overflow_handler);
         idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
+        idt[InterruptIndexAPIC::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
+        idt[InterruptIndexAPIC::LAPICTimer.as_u8()].set_handler_fn(lapic_timer_handler);
         // // Set the handler for the timer interrupt
         // idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         // // Set the handler for the keyboard interrupt
         // idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
-        idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
+        // idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         // idt[InterruptIndexAPIC::Spurious.as_usize()].set_handler_fn(spurious_interrupt_handler);
         idt
     };

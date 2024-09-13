@@ -3,8 +3,6 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::serial_println;
-
 use super::super::framebuffer::FRAMEBUFFER;
 use super::psf_font::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;

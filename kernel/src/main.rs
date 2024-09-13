@@ -1,22 +1,11 @@
 #![no_std]
 #![no_main]
 
-use alloc::{
-    fmt::format,
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use ferrum_os::*;
 
 use io::serial;
 use task::{executor, keyboard, Task};
-use x86_64::{
-    addr,
-    instructions::interrupts::enable,
-    structures::paging::{Mapper, Page, PhysFrame, Size4KiB, Translate},
-    PhysAddr, VirtAddr,
-};
 
 extern crate alloc;
 
@@ -30,8 +19,45 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 #[no_mangle]
 unsafe extern "C" fn _start() -> ! {
     ferrum_os::init();
+    welcome();
+    use timer::lapic::*;
+    use timer::pit::PIT;
+    lapic_calibrate();
+    // serial_println!("start");
+    // let start = PIT::get_counter();
+    // LAPICTimer::sleep(100);
+    // // timer::pit::PIT::sleep(1000);
+    // let end = PIT::get_counter();
+    // serial_println!("end");
+    // serial_println!("Ticks: {}", end - start);
+    let mut executor = executor::Executor::new();
+    executor.spawn(Task::new(keyboard::print_keypresses()));
+    executor.run();
+}
+fn calibrate() {
+    use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
+    use interrupts::InterruptIndexAPIC;
+    let ticks_per_ms = lapic_tick_per_ms();
+    LOCAL_APIC.write_register(LAPICReg::TimerLVT, InterruptIndexAPIC::LAPICTimer.as_u32());
+    LOCAL_APIC.write_register(LAPICReg::TimerDCnf, 0x3);
+    LOCAL_APIC.write_register(LAPICReg::TimerICnt, ticks_per_ms);
+    // serial_println!("start");
+    // temp_sleep(1000);
+    // serial_println!("end");
+    serial_println!("Ticks per ms: {}", ticks_per_ms);
+}
+fn lapic_tick_per_ms() -> u32 {
+    use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
+    use timer::pit::PIT;
+    let measure_duration: u32 = 1000;
+    LOCAL_APIC.write_register(LAPICReg::TimerDCnf, 0x3);
+    LOCAL_APIC.write_register(LAPICReg::TimerICnt, 0xFFFFFFFF);
+    PIT::sleep(measure_duration as u64);
+    let ticks_raw = 0xFFFFFFFF - LOCAL_APIC.read_register(LAPICReg::TimerCCnt);
+    ticks_raw / measure_duration
+}
+fn welcome() {
     let title = "FerrumOs has started";
-    let separator = "-".repeat(title.len());
     let mut features = "".to_string();
     #[cfg(feature = "test")]
     features.push_str("\n Test");
@@ -44,58 +70,12 @@ unsafe extern "C" fn _start() -> ! {
         separator = "-".repeat(title.len())
     );
     println!("Welcome to FerrumOs");
-    unsafe {
-        // let mut rbx: i64 = 0;
-        // let mut rdx: i64 = 0;
-        // let mut rcx: i64 = 0;
-        // asm!("mov rax, 0x0", "cpuid",);
-        // asm!("mov {rbx}, rbx",rbx = out(reg) rbx,);
-        // asm!("mov {rdx}, rdx",rdx = out(reg) rdx,);
-        // asm!("mov {rcx}, rcx",rcx = out(reg) rcx,);
-        // let mut string: String = String::new();
-        // string.push_str("CPUID: ");
-        // string.push_str(i64_to_str(rbx).as_str());
-        // string.push_str(i64_to_str(rdx).as_str());
-        // string.push_str(i64_to_str(rcx).as_str());
-
-        // println!("{}", string);
-
-        // if check_apic() {
-        //     println!("APIC Supported");
-        //     // enable_apic();
-        // } else {
-        //     panic!("APIC Not Supported");
-        // }
-        enable_apic();
-        // loop {
-        //     serial_println!("Start {:?}", crate::interrupts::handlers::COUNTER);
-        // }
-    }
-    let mut i = 'a' as u8;
-    loop {
-        print!("{}", i as char);
-        i += 1;
-        if i == 'z' as u8 {
-            i = i % ('z' as u8) + 'a' as u8;
-        }
-    }
-    // Async/await
-    let mut executor = executor::Executor::new();
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
 }
-
-fn enable_apic() {
-    use crate::drivers::apic::{io_apic::IOAPIC, local_apic::LocalAPIC};
-    LocalAPIC::enable();
-    IOAPIC::enable_ioapic();
-    timer();
-}
-
 fn timer() {
-    use timer::pit::PIT;
+    use timer::pit::{pit_config::*, PIT};
     let mut timer = PIT::new();
-    timer.set_timer(1);
+    timer.set_mode(PITOperatingMode::RateGenerator);
+    timer.set_timer(100);
     timer.start();
 }
 
@@ -119,9 +99,8 @@ async fn _async_world() {
     }
 }
 
-use core::{arch::asm, char, ptr, sync::atomic::AtomicU64};
+use core::{char, pin::Pin, time};
 
-#[allow(dead_code)]
 fn _heap_test_debug() {
     use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
     let heap_value = Box::new(41);
@@ -148,6 +127,7 @@ fn _heap_test_debug() {
     );
 }
 // TO DO : Throw error when stack overflow
+#[allow(unconditional_recursion)]
 fn _inf_rec() {
     _inf_rec();
     x86_64::instructions::hlt();

@@ -1,4 +1,7 @@
+// TO DO Documentation
+#[allow(dead_code)]
 pub struct PITConfig(u8);
+#[allow(dead_code)]
 pub enum PITOperatingMode {
     InterruptOnTerminalCount = 0b000,
     HardwareRetriggerableOneShot = 0b001,
@@ -7,20 +10,24 @@ pub enum PITOperatingMode {
     SoftwareTriggeredStrobe = 0b100,
     HardwareTriggeredStrobe = 0b101,
 }
+#[allow(dead_code)]
 pub enum PITAccessMode {
     AccessLowByte = 0b01,
     AccessHighByte = 0b10,
     AccessLowByteThenHighByte = 0b11,
 }
+#[allow(dead_code)]
 pub enum PITChannel {
     Channel0 = 0b00,
     Channel1 = 0b01,
     Channel2 = 0b10,
 }
+#[allow(dead_code)]
 pub enum PITEncoding {
     Binary = 0b0,
     BCD = 0b1,
 }
+#[allow(dead_code)]
 impl PITConfig {
     pub fn new() -> Self {
         PITConfig(0b0)

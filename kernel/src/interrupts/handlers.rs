@@ -1,5 +1,5 @@
 //! Interrupt handlers for the different interrupts
-use core::{ops::Add, sync::atomic::AtomicU64};
+use core::sync::atomic::{AtomicBool, AtomicU64};
 
 use crate::*;
 use lazy_static::lazy_static;
@@ -99,51 +99,56 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
 pub extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
     println!("EXCEPTION: OVERFLOW\n{:#?}", stack_frame);
 }
-pub static COUNTER: AtomicU64 = AtomicU64::new(0);
+use crate::drivers::apic::local_apic::LOCAL_APIC;
+use core::sync::atomic::*;
+pub static PIT_COUNTER: AtomicU64 = AtomicU64::new(0);
+pub static PIT_SLEEP_COUNTER: AtomicI64 = AtomicI64::new(0);
+pub static PIT_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
 /// Handler for the timer interrupt
 pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // print!(".");
-    let ptr = COUNTER.as_ptr();
-    unsafe { *ptr = COUNTER.load(core::sync::atomic::Ordering::Relaxed) + 1 };
-    // TO DO: Implement EOI for LAPIC
-    let mut ptr = (0xfee00000 as u32 + 0xB0 as u32) as *mut u32;
-    unsafe {
-        *ptr = 0;
+    PIT_COUNTER.store(PIT_COUNTER.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
+    if PIT_SLEEP_FLAG.load(Ordering::Relaxed) {
+        let ptr = PIT_SLEEP_COUNTER.as_ptr();
+        unsafe { *ptr = PIT_SLEEP_COUNTER.load(Ordering::Relaxed) - 1 };
     }
     // Notify the CPU that the interrupt has been handled
     // and can continue to send other interrupts
-    // unsafe {
-    //     PICS.lock()
-    //         .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
-    // }
+    LOCAL_APIC.set_eoi();
 }
-// /// Handler for the keyboard interrupt
-// pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
-//     use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
-//     use spin::Mutex;
-//     use x86_64::instructions::port::Port;
+pub static LAPIC_TIMER_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
+pub static LAPIC_TIMER_SLEEP_COUNTER: AtomicI64 = AtomicI64::new(0);
+pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
+    // print!(".");
+    if LAPIC_TIMER_SLEEP_FLAG.load(Ordering::Relaxed) {
+        let ptr = LAPIC_TIMER_SLEEP_COUNTER.as_ptr();
+        unsafe { *ptr = LAPIC_TIMER_SLEEP_COUNTER.load(Ordering::Relaxed) - 1 };
+    }
+    LOCAL_APIC.set_eoi();
+}
+/// Handler for the keyboard interrupt
+pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
+    use spin::Mutex;
+    use x86_64::instructions::port::Port;
+    lazy_static! {
+        /// Keyboard instance used for handling keyboard interrupts
+        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+            Mutex::new(Keyboard::new(
+                ScancodeSet1::new(),
+                layouts::Us104Key,
+                HandleControl::Ignore
+            ));
+    }
 
-//     lazy_static! {
-//         /// Keyboard instance used for handling keyboard interrupts
-//         static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-//             Mutex::new(Keyboard::new(
-//                 ScancodeSet1::new(),
-//                 layouts::Us104Key,
-//                 HandleControl::Ignore
-//             ));
-//     }
+    let mut _keyboard = KEYBOARD.lock();
 
-//     let mut _keyboard = KEYBOARD.lock();
+    let mut port = Port::new(0x60);
+    // Read the scancode from the keyboard
+    let scancode: u8 = unsafe { port.read() };
+    crate::task::keyboard::add_scancode(scancode);
 
-//     let mut port = Port::new(0x60);
-//     // Read the scancode from the keyboard
-//     let scancode: u8 = unsafe { port.read() };
-//     crate::task::keyboard::add_scancode(scancode);
-
-//     // Notify the CPU that the interrupt has been handled
-//     // and can continue to send other interrupts
-//     unsafe {
-//         PICS.lock()
-//             .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
-//     }
-// }
+    // Notify the CPU that the interrupt has been handled
+    // and can continue to send other interrupts
+    LOCAL_APIC.set_eoi();
+}
