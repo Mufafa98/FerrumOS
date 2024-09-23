@@ -87,11 +87,11 @@ impl TextWriter {
     fn clear_row(&mut self, row_start: u64) {
         for row in row_start..FRAMEBUFFER.get_height() {
             for col in 0..FRAMEBUFFER.get_width() {
-                let nrow = row * FRAMEBUFFER.get_pitch();
-                let ncol = col * 4;
-                let pixel = FRAMEBUFFER.get_pixel_on_coords(ncol, nrow);
+                // let nrow = row * FRAMEBUFFER.get_pitch();
+                // let ncol = col * 4;
+                let pixel = FRAMEBUFFER.get_pixel(col, row);
                 if pixel == self.fg_color.to_u32() || pixel == self.bg_color.to_u32() {
-                    FRAMEBUFFER.put_pixel_on_coords(ncol, nrow, self.bg_color.to_u32());
+                    FRAMEBUFFER.put_pixel(col, row, self.bg_color.to_u32());
                 }
             }
         }

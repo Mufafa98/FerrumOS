@@ -1,4 +1,5 @@
 //! Simple Executor module
+//! Might be removed in future versions
 
 use super::Task;
 use alloc::collections::VecDeque;

@@ -1,6 +1,4 @@
 //! Memory management module
-// use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
-// TO DO : check if equivalent
 use limine::memory_map::{Entry, EntryType};
 use limine::request::MemoryMapRequest;
 use x86_64::{
