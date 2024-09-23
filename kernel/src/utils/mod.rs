@@ -1,9 +1,12 @@
 //! Utils crate responsable with panic handlers, test utils
 //! and vm management
 
+pub mod cpuid;
 pub mod custom_types;
+pub mod msr;
 pub mod panic_module;
 mod qemu_utils;
+pub mod registers;
 mod test_utils;
 
 /// Util function to exit qemu with an error code
