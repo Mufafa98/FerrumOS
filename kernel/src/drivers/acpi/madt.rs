@@ -1,7 +1,8 @@
 use super::ACPISDTHeader;
-use crate::drivers::apic::io_apic::IOAPICStruct;
+use crate::{drivers::apic::io_apic::IOAPICStruct, serial_println};
 use alloc::vec::Vec;
 #[allow(dead_code)]
+#[derive(Debug)]
 enum MADTEntry {
     LocalApicEntry {
         // Type 0
@@ -136,6 +137,7 @@ impl MADT {
                     // println!("Unknown Entry Type In MADT Table: {}", entry_type);
                 }
             }
+            //serial_println!("Entry: {:?}", entries.last().unwrap());
             if record_length as u32 > left_to_read {
                 left_to_read = 0;
             } else {

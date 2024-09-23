@@ -9,7 +9,7 @@ pub fn lapic_calibrate() {
     LAPICTimer::set_active(false);
     let ticks_raw = max_ticks - LAPICTimer::get_current_ticks();
     let ticks = ticks_raw;
-    serial_println!("Ticks per 10ms: {}", ticks);
+    // serial_println!("Ticks per 10ms: {}", ticks);
     LAPICTimer::set_lvt();
     LAPICTimer::set_periodic(true);
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);

@@ -96,12 +96,6 @@ lazy_static! {
         idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndexAPIC::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
         idt[InterruptIndexAPIC::LAPICTimer.as_u8()].set_handler_fn(lapic_timer_handler);
-        // // Set the handler for the timer interrupt
-        // idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
-        // // Set the handler for the keyboard interrupt
-        // idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
-        // idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
-        // idt[InterruptIndexAPIC::Spurious.as_usize()].set_handler_fn(spurious_interrupt_handler);
         idt
     };
 }

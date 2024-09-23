@@ -11,7 +11,9 @@ override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial 
 
 override INTERRUPT_PARAMS := -d int -D qemu_interrupts.log
 
-override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) 
+override CPU_PARAMS := # -smp 4
+
+override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) $(CPU_PARAMS)
 
 .SILENT: all all-hdd run run-uefi run-hdd run-hdd-uefi check ovmf limine kernel $(IMAGE_NAME).iso $(IMAGE_NAME).hdd clean distclean
 
