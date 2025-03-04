@@ -5,6 +5,7 @@ pub mod cpuid;
 pub mod custom_types;
 pub mod msr;
 pub mod panic_module;
+pub mod port;
 mod qemu_utils;
 pub mod registers;
 mod test_utils;

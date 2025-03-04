@@ -1,6 +1,6 @@
 //! Module for handling interrupts
 
-use crate::gdt;
+use crate::{gdt, serial_println};
 use handlers::*;
 use lazy_static::lazy_static;
 use x86_64::structures::idt::InterruptDescriptorTable;
@@ -50,6 +50,7 @@ pub enum InterruptIndexAPIC {
     Timer = 32,
     LAPICTimer,
     Keyboard,
+    HPET,
     Spurious = 0xFF,
 }
 impl InterruptIndexAPIC {
@@ -96,6 +97,8 @@ lazy_static! {
         idt[InterruptIndexAPIC::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndexAPIC::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
         idt[InterruptIndexAPIC::LAPICTimer.as_u8()].set_handler_fn(lapic_timer_handler);
+        idt[InterruptIndexAPIC::HPET.as_u8()].set_handler_fn(hpet_interrupt_handler);
+
         idt
     };
 }

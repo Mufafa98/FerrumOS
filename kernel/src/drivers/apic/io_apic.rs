@@ -75,4 +75,5 @@ pub fn init() {
     use crate::interrupts::InterruptIndexAPIC;
     IO_APIC.set_red_tbl_vec(2, InterruptIndexAPIC::Timer as u8);
     IO_APIC.set_red_tbl_vec(1, InterruptIndexAPIC::Keyboard as u8);
+    IO_APIC.set_red_tbl_vec(0x12, InterruptIndexAPIC::HPET as u8);
 }

@@ -1,14 +1,9 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
-// TO SOLVE
-// #![feature(custom_test_frameworks)]
-// #![test_runner(utils::test_runner)]
-// #![reexport_test_harness_main = "test_main"]
 #![feature(const_mut_refs)]
 
 extern crate alloc;
-//maybe refactor in memory?
 pub mod allocator;
 //-------------------------
 pub mod drivers;

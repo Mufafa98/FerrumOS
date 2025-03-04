@@ -125,6 +125,18 @@ pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFr
         unsafe { *ptr = LAPIC_TIMER_SLEEP_COUNTER.load(Ordering::Relaxed) - 1 };
     }
     LOCAL_APIC.set_eoi();
+} // TO DO : Swap to AtomicU64
+pub static HPET_SLEEP_COUNTER: AtomicI64 = AtomicI64::new(0);
+pub static HPET_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
+pub extern "x86-interrupt" fn hpet_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    // serial_println!("HPET: {}", HPET_SLEEP_COUNTER.load(Ordering::Relaxed));
+    if HPET_SLEEP_FLAG.load(Ordering::Relaxed) {
+        HPET_SLEEP_COUNTER.store(
+            HPET_SLEEP_COUNTER.load(Ordering::Relaxed) + 1,
+            Ordering::Relaxed,
+        );
+    }
+    LOCAL_APIC.set_eoi();
 }
 /// Handler for the keyboard interrupt
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {

@@ -1,3 +1,4 @@
+use super::hpet::HPET;
 use super::madt::MADT;
 use super::ACPISDTHeader;
 use crate::serial_println;
@@ -48,6 +49,16 @@ impl RSDT {
             let signature = unsafe { core::str::from_utf8_unchecked(&header.signature) };
             if signature == "APIC" {
                 return Some(MADT::new(*entry));
+            }
+        }
+        None
+    }
+    pub fn get_hpet(&self) -> Option<HPET> {
+        for entry in self.entries.iter() {
+            let header = ACPISDTHeader::new(*entry);
+            let signature = unsafe { core::str::from_utf8_unchecked(&header.signature) };
+            if signature == "HPET" {
+                return Some(HPET::new(*entry));
             }
         }
         None
