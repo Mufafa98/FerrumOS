@@ -23,3 +23,7 @@ logs/
 
 # Added by cargo
 /target
+
+**/*.iso
+**/*.img
+**/*.sh
