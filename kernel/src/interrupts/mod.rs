@@ -51,6 +51,10 @@ pub enum InterruptIndexAPIC {
     LAPICTimer,
     Keyboard,
     HPET,
+    //Test ata
+    AtaMaster,
+    AtaSlave,
+    //Test ata
     Spurious = 0xFF,
 }
 impl InterruptIndexAPIC {
@@ -98,7 +102,8 @@ lazy_static! {
         idt[InterruptIndexAPIC::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
         idt[InterruptIndexAPIC::LAPICTimer.as_u8()].set_handler_fn(lapic_timer_handler);
         idt[InterruptIndexAPIC::HPET.as_u8()].set_handler_fn(hpet_interrupt_handler);
-
+        // idt[InterruptIndexAPIC::AtaMaster.as_u8()].set_handler_fn(ata_test);
+        // idt[InterruptIndexAPIC::AtaSlave.as_u8()].set_handler_fn(ata_test);
         idt
     };
 }

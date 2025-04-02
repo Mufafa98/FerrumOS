@@ -133,7 +133,9 @@ unsafe impl GlobalAlloc for Locked<LinkedListAllocator> {
         if let Some((region, alloc_start)) = allocator.find_region(size, align) {
             // If a region was found, calculate the end address of the allocation
             // and add the excess size
-            let alloc_end = alloc_start.checked_add(size).expect("overflow");
+            let alloc_end = alloc_start
+                .checked_add(size)
+                .expect("overflow at LinkedList Allocator");
             let excess_size = region.end_addr() - alloc_end;
             // If there is excess size, add a new free region
             if excess_size > 0 {

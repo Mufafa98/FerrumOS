@@ -3,7 +3,6 @@
 
 use alloc::string::{String, ToString};
 use ferrum_os::*;
-
 use io::serial;
 use task::{executor, keyboard, Task};
 use timer::Time;
@@ -20,24 +19,22 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 }
 #[no_mangle]
 unsafe extern "C" fn _start() -> ! {
-    use drivers::ata::test;
+    // use drivers::ata::test;
     ferrum_os::init();
     welcome();
-    //hpet();
-    // ata();
-    test();
-    pci();
+
+    // serial_println!("Testing");
+    // hpet();
+    // serial_println!("Done");
+
+    ata();
+    // test();
+    // pci();
     let mut executor = executor::Executor::new();
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
 }
-fn pci() {
 
-    // use drivers::pci::PCI;
-
-    // let pci = PCI::new();
-    // pci.scan();
-}
 fn calibrate() {
     use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
     use interrupts::InterruptIndexAPIC;
@@ -157,16 +154,16 @@ fn hpet() {
     // hpet.enable();
     use crate::timer::hpet::HPETTimer;
     let timer = HPETTimer::new();
-    timer.sleep(Time::Nanoseconds(1000));
+    timer.sleep(Time::Nanoseconds(10000));
 }
 
-// fn ata() {
-//     const ATA_BLOCK_SIZE: usize = 512;
-//     drivers::ata::init();
-//     let mut buffer: [u8; ATA_BLOCK_SIZE] = [0; ATA_BLOCK_SIZE];
-//     // drivers::ata::read(0, 0, 0, &mut buffer);
-//     // for i in 0..ATA_BLOCK_SIZE {
-//     //     serial_print!("{:X} ", buffer[i]);
-//     // }
-//     serial_println!("\nDone");
-// }
+fn ata() {
+    const ATA_BLOCK_SIZE: usize = 512;
+    drivers::ata::init();
+    let mut buffer: [u8; ATA_BLOCK_SIZE] = [0; ATA_BLOCK_SIZE];
+    // drivers::ata::read(0, 0, 0, &mut buffer);
+    // for i in 0..ATA_BLOCK_SIZE {
+    //     serial_print!("{:X} ", buffer[i]);
+    // }
+    serial_println!("\nDone");
+}

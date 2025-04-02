@@ -76,4 +76,8 @@ pub fn init() {
     IO_APIC.set_red_tbl_vec(2, InterruptIndexAPIC::Timer as u8);
     IO_APIC.set_red_tbl_vec(1, InterruptIndexAPIC::Keyboard as u8);
     IO_APIC.set_red_tbl_vec(0x12, InterruptIndexAPIC::HPET as u8);
+    //TEST ATA
+    IO_APIC.set_red_tbl_vec(0x14, InterruptIndexAPIC::AtaMaster as u8);
+    IO_APIC.set_red_tbl_vec(0x15, InterruptIndexAPIC::AtaSlave as u8);
+    //TEST ATA
 }

@@ -12,7 +12,6 @@ impl PortRead for u8 {
     unsafe fn read_from_port(port: u16) -> Self {
         let value: u8;
         unsafe {
-            // TODO explain options and understand
             asm!(
                 "in al, dx",
                 out("al") value,
@@ -61,14 +60,6 @@ impl PortWrite for u8 {
                 in("al") value,
                 options(nomem, nostack, preserves_flags)
             );
-
-            // asm!(
-            //     "out dx, al",
-            //     "jmp 1235643f",
-            //     "1235643:",
-            //     in("dx") port,
-            //     in("al") value,
-            //     options(nomem, nostack, preserves_flags));
         }
     }
 }

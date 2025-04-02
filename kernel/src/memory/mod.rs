@@ -43,7 +43,6 @@ pub struct BootInfoFrameAllocator {
     next: usize,
 }
 impl BootInfoFrameAllocator {
-    // TO DO : understand the return type and the function
     /// Returns an iterator over the usable frames specified in the memory map.
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         // get usable regions from memory map

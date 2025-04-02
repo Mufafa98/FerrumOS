@@ -11,11 +11,17 @@ override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial 
 
 override INTERRUPT_PARAMS := -d int -D qemu_interrupts.log
 
-override CPU_PARAMS := # -smp 4
+override CPU_PARAMS := # -smp 4 
 
-override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) $(CPU_PARAMS)
+override DISK_PARAMS := -drive file=di_128M.img,format=raw,index=0,id=MFDrive,media=disk
 
-.SILENT: all all-hdd run run-uefi run-hdd run-hdd-uefi check ovmf limine kernel $(IMAGE_NAME).iso $(IMAGE_NAME).hdd clean distclean
+override CUSTOM_PARAMS := $(DISPLAY_TECH) $(DEBUG_PARAMS) $(CPU_PARAMS) $(DISK_PARAMS) 
+
+override Q35_MACHINE := q35
+override PC_MACHINE := pc
+override MACHINE := -M $(PC_MACHINE)
+
+.SILENT: all all-hdd run run-uefi run-hdd run-hdd2 run-hdd-uefi check ovmf limine kernel $(IMAGE_NAME).iso $(IMAGE_NAME).hdd clean distclean
 
 .PHONY: all
 all: $(IMAGE_NAME).iso
@@ -25,19 +31,11 @@ all-hdd: $(IMAGE_NAME).hdd
 
 .PHONY: run
 run: $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
-
-.PHONY: run-uefi
-run-uefi: ovmf $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
+	qemu-system-x86_64 $(MACHINE) -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
 
 .PHONY: run-hdd
 run-hdd: $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
-
-.PHONY: run-hdd-uefi
-run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
+	qemu-system-x86_64 $(MACHINE) -m 2G -hda $(IMAGE_NAME).hdd $(CUSTOM_PARAMS)
 
 .PHONY: check
 check:
@@ -48,7 +46,7 @@ doc:
 
 .PHONY: run-test
 run-test: $(IMAGE_NAME).iso.test
-	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
+	qemu-system-x86_64 $(MACHINE) -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
 
 $(IMAGE_NAME).iso.test: limine test
 	rm -rf iso_root
@@ -90,7 +88,7 @@ $(IMAGE_NAME).iso: limine kernel
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		iso_root -o $(IMAGE_NAME).iso
 	limine/limine-deploy $(IMAGE_NAME).iso
-	rm -rf iso_root
+	# rm -rf iso_root
 
 $(IMAGE_NAME).hdd: limine kernel
 	rm -f $(IMAGE_NAME).hdd

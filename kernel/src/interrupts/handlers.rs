@@ -131,7 +131,7 @@ pub static HPET_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
 pub extern "x86-interrupt" fn hpet_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // serial_println!("HPET: {}", HPET_SLEEP_COUNTER.load(Ordering::Relaxed));
     if HPET_SLEEP_FLAG.load(Ordering::Relaxed) {
-        HPET_SLEEP_COUNTER.store(
+        HPET_SLEEP_COUNTER.fetch_add(
             HPET_SLEEP_COUNTER.load(Ordering::Relaxed) + 1,
             Ordering::Relaxed,
         );
