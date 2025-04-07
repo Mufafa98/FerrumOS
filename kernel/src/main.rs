@@ -19,7 +19,6 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 }
 #[no_mangle]
 unsafe extern "C" fn _start() -> ! {
-    // use drivers::ata::test;
     ferrum_os::init();
     welcome();
 
@@ -27,9 +26,8 @@ unsafe extern "C" fn _start() -> ! {
     // hpet();
     // serial_println!("Done");
 
-    ata();
-    // test();
-    // pci();
+    crate::fs::ext2::init();
+
     let mut executor = executor::Executor::new();
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
@@ -155,15 +153,4 @@ fn hpet() {
     use crate::timer::hpet::HPETTimer;
     let timer = HPETTimer::new();
     timer.sleep(Time::Nanoseconds(10000));
-}
-
-fn ata() {
-    const ATA_BLOCK_SIZE: usize = 512;
-    drivers::ata::init();
-    let mut buffer: [u8; ATA_BLOCK_SIZE] = [0; ATA_BLOCK_SIZE];
-    // drivers::ata::read(0, 0, 0, &mut buffer);
-    // for i in 0..ATA_BLOCK_SIZE {
-    //     serial_print!("{:X} ", buffer[i]);
-    // }
-    serial_println!("\nDone");
 }

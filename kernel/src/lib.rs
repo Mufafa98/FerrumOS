@@ -6,6 +6,7 @@
 extern crate alloc;
 pub mod allocator;
 pub mod drivers;
+pub mod fs;
 pub mod gdt;
 pub mod interrupts;
 pub mod io;
@@ -47,6 +48,8 @@ pub fn init() {
 
     drivers::apic::local_apic::init();
     drivers::apic::io_apic::init();
+
+    drivers::ata::init();
 }
 
 /// Performant empty loop thet saves cpu time

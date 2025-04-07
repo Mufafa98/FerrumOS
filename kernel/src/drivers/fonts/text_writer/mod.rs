@@ -23,7 +23,8 @@ impl TextWriter {
         TextWriter {
             x_position: 0,
             fg_color: Color::new(255, 255, 255, 255),
-            bg_color: Color::new(0, 122, 1, 1),
+            // bg_color: Color::new(0, 122, 1, 1),
+            bg_color: Color::new(0, 0, 0, 255),
             font,
             font_size_multiplier: 1,
         }

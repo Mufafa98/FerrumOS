@@ -1,9 +1,9 @@
 extern crate alloc;
-// TODO ???????
-
+// TODO: what optimizes release and blocks the execution?
 use crate::io::serial;
 use crate::utils::port::*;
-use crate::{hlt_loop, print, serial_print, serial_println};
+use crate::{hlt_loop, print, println, serial_print, serial_println};
+use alloc::format;
 use alloc::vec::Vec;
 use bit_field::BitField;
 use core::arch::asm;
@@ -12,9 +12,21 @@ use core::task::Poll;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use core::hint::spin_loop;
-
 pub type BlockIndex = u32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Drive {
+    Master = 0,
+    Slave = 1,
+}
+impl Drive {
+    fn to_bool(&self) -> bool {
+        match self {
+            Drive::Master => false,
+            Drive::Slave => true,
+        }
+    }
+}
 
 #[repr(u16)]
 enum Command {
@@ -101,6 +113,16 @@ impl ATARegisters {
     }
 }
 
+#[derive(Debug)]
+pub enum BusError {
+    NoDrive,
+    DriveNotAta,
+    UnableToRead,
+    NotInitMembers,
+    InvalidBufferSize,
+    InvalidBusIdx,
+}
+
 pub struct Bus {
     id: u8,
     irq: u8,
@@ -108,8 +130,9 @@ pub struct Bus {
     ctrl_base: u16,
     io_base: u16,
 
-    registers: ATARegisters,
+    ata_reg: ATARegisters,
 
+    slave: Option<bool>,
     lba48_supported: Option<bool>,
     udma: Option<UDMA>,
     lba28_adr_sectors: Option<u32>,
@@ -125,8 +148,9 @@ impl Bus {
             ctrl_base,
             io_base,
 
-            registers: ATARegisters::new(io_base, ctrl_base),
+            ata_reg: ATARegisters::new(io_base, ctrl_base),
 
+            slave: None,
             lba48_supported: None,
             udma: None,
             lba28_adr_sectors: None,
@@ -135,164 +159,190 @@ impl Bus {
     }
 
     ///home/Mufafa98_Arch_Laptop/Downloads/ATA8-Command-Set.pdf pp 102
-    unsafe fn identify(&mut self, master_drive: bool) {
+    fn identify(&mut self, drive: Drive) -> Result<(), BusError> {
         use crate::timer::hpet::HPETTimer;
         use crate::timer::Time;
         let hpet_timer = HPETTimer::new();
-
-        self.registers.control_register.write(0);
-        hpet_timer.sleep(Time::Nanoseconds(400));
-        self.registers.sector_count_register.write(0);
-        hpet_timer.sleep(Time::Nanoseconds(400));
-
-        self.registers.drive_register.write(if master_drive {
-            serial_println!("Master Drive");
-            Command::MasterDriveSelector as u8
-        } else {
-            serial_println!("Slave Drive");
-            Command::SlaveDriveSelector as u8
-        });
-        hpet_timer.sleep(Time::Nanoseconds(400));
-        self.registers.sector_count_register.write(0);
-        self.registers.lba0_register.write(0);
-        self.registers.lba1_register.write(0);
-        self.registers.lba2_register.write(0);
-        serial_println!("Setting up registers");
-        self.registers
-            .command_register
-            .write(Command::Identify as u8);
-        serial_println!("Sent Identify Command");
-        hpet_timer.sleep(Time::Nanoseconds(400));
-
-        let mut status = self.registers.alternate_status_register.read();
-        let error = self.registers.error_register.read();
-
-        if status == 0x00 {
-            panic!("No drive found");
-            return;
-        }
-        loop {
-            status = self.registers.status_register.read();
-            if !status.get_bit(Status::BSY as usize) {
-                break;
+        let debug_str = format!(
+            "[ATA_{}]: ",
+            if drive == Drive::Master {
+                "Master"
+            } else {
+                "Slave"
             }
-        }
-        serial_println!("Drive found");
-        let lba_mid = self.registers.lba1_register.read();
-        let lba_high = self.registers.lba2_register.read();
-        if lba_mid != 0 || lba_high != 0 {
-            panic!("Drive is not ATA");
-        }
-
-        loop {
-            status = self.registers.status_register.read();
-            if status.get_bit(Status::DRQ as usize) {
-                break;
-            }
-            if status.get_bit(Status::ERR as usize) {
-                panic!("Error reading drive");
-            }
-        }
-        serial_println!("Drive is ready");
-
-        let mut buf = [0u16; 256];
-        for i in 0..256 {
-            buf[i] = self.registers.data_register.read();
-            // serial_println!("buf[{}]: 0x{:04X}", i, buf[i]);
-        }
-
+        );
         unsafe {
+            self.ata_reg.control_register.write(0);
+            hpet_timer.sleep(Time::Nanoseconds(400));
+            self.ata_reg.sector_count_register.write(0);
+            hpet_timer.sleep(Time::Nanoseconds(400));
+
+            self.slave = Some(drive.to_bool());
+            if drive == Drive::Master {
+                self.ata_reg
+                    .drive_register
+                    .write(Command::MasterDriveSelector as u8);
+            } else {
+                self.ata_reg
+                    .drive_register
+                    .write(Command::SlaveDriveSelector as u8);
+            }
+            hpet_timer.sleep(Time::Nanoseconds(400));
+            self.ata_reg.sector_count_register.write(0);
+            self.ata_reg.lba0_register.write(0);
+            self.ata_reg.lba1_register.write(0);
+            self.ata_reg.lba2_register.write(0);
+            // serial_println!("Setting up registers");
+            println!("{}Setting up registers", debug_str);
+            self.ata_reg.command_register.write(Command::Identify as u8);
+            // serial_println!("Sent Identify Command");
+            println!("{}Sent Identify Command", debug_str);
+            hpet_timer.sleep(Time::Nanoseconds(400));
+
+            let mut status = self.ata_reg.alternate_status_register.read();
+            let error = self.ata_reg.error_register.read();
+
+            if status == 0x00 {
+                println!("{}Drive not found", debug_str);
+                return Err(BusError::NoDrive);
+            }
+            loop {
+                status = self.ata_reg.status_register.read();
+                if !status.get_bit(Status::BSY as usize) {
+                    break;
+                }
+            }
+            // serial_println!("Drive found");
+            println!("{}Drive found", debug_str);
+            let lba_mid = self.ata_reg.lba1_register.read();
+            let lba_high = self.ata_reg.lba2_register.read();
+            if lba_mid != 0 || lba_high != 0 {
+                println!("{}Drive is not ATA", debug_str);
+                return Err(BusError::DriveNotAta);
+            }
+
+            loop {
+                status = self.ata_reg.status_register.read();
+                if status.get_bit(Status::DRQ as usize) {
+                    break;
+                }
+                if status.get_bit(Status::ERR as usize) {
+                    println!("{}Unable to read from drive", debug_str);
+                    return Err(BusError::UnableToRead);
+                }
+            }
+            // serial_println!("Drive is ready");
+            println!("{}Drive is ready", debug_str);
+
+            let mut buf = [0u16; 256];
+            for i in 0..256 {
+                buf[i] = self.ata_reg.data_register.read();
+            }
+
             self.udma = Some(UDMA::from_ibf(buf[88]));
-        }
-        let mut lba32 = 0;
-        lba32 |= (buf[61] as u32) << 16;
-        lba32 |= (buf[60] as u32) << 0;
-        self.lba28_adr_sectors = Some(lba32);
-        self.lba48_supported = Some(buf[83] >> 10 & 0b1 == 1);
-        if self.lba48_supported.unwrap() {
-            let mut lba48 = 0;
-            lba48 |= (buf[103] as u64) << 48;
-            lba48 |= (buf[102] as u64) << 32;
-            lba48 |= (buf[101] as u64) << 16;
-            lba48 |= (buf[100] as u64) << 0;
-            self.lba48_adr_sectors = Some(lba48);
-        }
-        serial_println!("Drive Info:");
-        serial_println!("  UDMA Mode: {:?}", self.udma);
-        serial_println!("  LBA28: {}", self.lba28_adr_sectors.unwrap());
-        if self.lba48_supported.unwrap() {
-            serial_println!("  LBA48: {}", self.lba48_adr_sectors.unwrap());
-        } else {
-            serial_println!("  LBA48: Not supported");
+
+            let mut lba32 = 0;
+            lba32 |= (buf[61] as u32) << 16;
+            lba32 |= (buf[60] as u32) << 0;
+            self.lba28_adr_sectors = Some(lba32);
+            self.lba48_supported = Some(buf[83] >> 10 & 0b1 == 1);
+            if self.lba48_supported.unwrap() {
+                let mut lba48 = 0;
+                lba48 |= (buf[103] as u64) << 48;
+                lba48 |= (buf[102] as u64) << 32;
+                lba48 |= (buf[101] as u64) << 16;
+                lba48 |= (buf[100] as u64) << 0;
+                self.lba48_adr_sectors = Some(lba48);
+            }
+            println!("{}Everything is ok", debug_str);
+            return Ok(());
         }
     }
 
-    fn setup28(&mut self, slave: bool, block: u32) {
-        let drive_id = 0xE0 | ((slave as u8) << 4);
-        unsafe {
-            self.registers
-                .drive_register
-                .write(drive_id | ((block.get_bits(24..28) as u8) & 0x0F));
-            self.registers.sector_count_register.write(1);
-            self.registers
-                .lba0_register
-                .write(block.get_bits(0..8) as u8);
-            self.registers
-                .lba1_register
-                .write(block.get_bits(8..16) as u8);
-            self.registers
-                .lba2_register
-                .write(block.get_bits(16..24) as u8);
-        }
-    }
-
-    pub fn read(&mut self, slave: bool, block: BlockIndex, buf: &mut [u8]) {
-        if buf.len() != 512 {
-            panic!("Buffer size must be 512 bytes");
-        }
-        self.setup28(slave, block as u32);
-        unsafe {
-            self.registers.command_register.write(Command::Read as u8);
-        }
-        while unsafe {
-            self.registers
-                .status_register
-                .read()
-                .get_bit(Status::BSY as usize)
-        } {}
-        for i in 0..256 {
-            let data = unsafe { self.registers.data_register.read() };
-            buf[i * 2] = (data & 0xFF) as u8;
-            buf[i * 2 + 1] = (data >> 8) as u8;
-        }
-    }
-
-    pub fn write(&mut self, slave: bool, block: BlockIndex, buf: &[u8]) {
-        if buf.len() != 512 {
-            panic!("Buffer size must be 512 bytes");
-        }
-        self.setup28(slave, block as u32);
-        unsafe {
-            self.registers.command_register.write(Command::Write as u8);
-        }
-        while unsafe {
-            self.registers
-                .status_register
-                .read()
-                .get_bit(Status::BSY as usize)
-        } {}
-        for i in 0..256 {
-            let mut data = 0 as u16;
-            data.set_bits(0..8, buf[i * 2] as u16);
-            data.set_bits(8..16, buf[i * 2 + 1] as u16);
-            serial_println!("Writing data: 0x{:04X}", data);
-            unsafe { self.registers.data_register.write(data) };
+    fn setup28(&mut self, block: u32) -> Result<(), BusError> {
+        if let Some(slave) = self.slave {
+            let drive_id = 0xE0 | ((slave as u8) << 4);
             unsafe {
-                self.registers
-                    .command_register
-                    .write(Command::CacheFlush as u8);
+                self.ata_reg
+                    .drive_register
+                    .write(drive_id | ((block.get_bits(24..28) as u8) & 0x0F));
+                self.ata_reg.sector_count_register.write(1);
+                self.ata_reg.lba0_register.write(block.get_bits(0..8) as u8);
+                self.ata_reg
+                    .lba1_register
+                    .write(block.get_bits(8..16) as u8);
+                self.ata_reg
+                    .lba2_register
+                    .write(block.get_bits(16..24) as u8);
+            }
+            return Ok(());
+        } else {
+            // panic!("Slave drive not set. Maybe init() was not called?");
+            return Err(BusError::NotInitMembers);
+        }
+    }
+
+    fn is_busy(&self) -> bool {
+        unsafe {
+            self.ata_reg
+                .status_register
+                .read()
+                .get_bit(Status::BSY as usize)
+        }
+    }
+
+    fn write_command(&mut self, command: Command) {
+        unsafe {
+            self.ata_reg.command_register.write(command as u8);
+        }
+    }
+
+    fn read_data(&mut self) -> u16 {
+        unsafe { self.ata_reg.data_register.read() }
+    }
+
+    fn write_data(&mut self, data: u16) {
+        unsafe { self.ata_reg.data_register.write(data) }
+    }
+
+    pub fn read(&mut self, block: BlockIndex, buf: &mut [u8]) -> Result<(), BusError> {
+        if buf.len() != 512 {
+            // panic!("Buffer size must be 512 bytes");
+            return Err(BusError::InvalidBufferSize);
+        }
+        let setup_result = self.setup28(block as u32);
+        if let Ok(_) = setup_result {
+            self.write_command(Command::Read);
+            while self.is_busy() {}
+
+            for i in 0..256 {
+                let data = self.read_data();
+                buf[i * 2] = (data & 0xFF) as u8;
+                buf[i * 2 + 1] = (data >> 8) as u8;
             }
         }
+        return setup_result;
+    }
+
+    pub fn write(&mut self, block: BlockIndex, buf: &[u8]) -> Result<(), BusError> {
+        if buf.len() != 512 {
+            // panic!("Buffer size must be 512 bytes");
+            return Err(BusError::InvalidBufferSize);
+        }
+        let setup_result = self.setup28(block as u32);
+        if let Ok(_) = setup_result {
+            self.write_command(Command::Write);
+            while self.is_busy() {}
+            for i in 0..256 {
+                let mut data = 0 as u16;
+                data.set_bits(0..8, buf[i * 2] as u16);
+                data.set_bits(8..16, buf[i * 2 + 1] as u16);
+
+                self.write_data(data);
+                self.write_command(Command::CacheFlush);
+            }
+        }
+        return setup_result;
     }
 }
 
@@ -300,43 +350,25 @@ lazy_static! {
     static ref BUSES: Mutex<Vec<Bus>> = Mutex::new(Vec::new());
 }
 
-pub fn read(bus: u8, drive: u8, block: BlockIndex, buf: &mut [u8]) {
+pub fn read(bus: u8, block: BlockIndex, buf: &mut [u8]) -> Result<(), BusError> {
+    if bus as usize >= BUSES.lock().len() {
+        return Err(BusError::InvalidBusIdx);
+    }
     let mut buses = BUSES.lock();
-    //log!("Reading Block 0x{:08X}\n", block);
-    // buses[bus as usize].read(drive, block, buf);
+    buses[bus as usize].read(block, buf)
 }
 
 pub fn init() {
-    let mut bus = Bus::new(0, 0x1F0, 0x3F6, 14);
-    unsafe { bus.identify(true) };
-    let mut buf = [0u8; 512];
-    bus.read(false, 0, &mut buf);
-    for i in 0..512 {
-        serial_print!("{:02X} ", buf[i]);
-        if i % 16 == 15 {
-            serial_print!("\n");
-        }
+    let mut master = Bus::new(0, 0x1F0, 0x3F6, 14);
+    if let Err(err) = master.identify(Drive::Master) {
+        serial_println!("Master Error: {:?}", err);
+    } else {
+        BUSES.lock().push(master);
     }
-    bus.read(false, 1, &mut buf);
-    for i in 0..512 {
-        serial_print!("{:02X} ", buf[i]);
-        if i % 16 == 15 {
-            serial_print!("\n");
-        }
+    let mut slave = Bus::new(1, 0x170, 0x376, 15);
+    if let Err(err) = slave.identify(Drive::Slave) {
+        serial_println!("Slave Error: {:?}", err);
+    } else {
+        BUSES.lock().push(slave);
     }
-    // buf = [0x45; 512];
-    // bus.write(false, 0, &buf);
-    // bus.write(false, 1, &buf);
-
-    // let mut buses = BUSES.lock();
-    // let mut master = Bus::new(0, 0x1F0, 0x3F6, 14);
-
-    // // master.reset();
-    // serial_println!("ATA Reset Done");
-    // master.print_type();
-    // buses.push(master);
-
-    // master.write_command(Command::Identify);
-    // buses.push(Bus::new(1, 0x170, 0x376, 15));
-    // serial_println!("ATA initialized");
 }
