@@ -1,8 +1,5 @@
 use super::Time;
-use crate::{
-    drivers::acpi::hpet::{HPETRegisters, HPET},
-    serial_println,
-};
+use crate::drivers::acpi::hpet::{HPETRegisters, HPET};
 pub struct HPETTimer {
     hpet: HPET,
     frequency: Time,

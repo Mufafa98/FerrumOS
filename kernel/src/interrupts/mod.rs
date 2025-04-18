@@ -1,6 +1,6 @@
 //! Module for handling interrupts
 
-use crate::{gdt, serial_println};
+use crate::gdt;
 use handlers::*;
 use lazy_static::lazy_static;
 use x86_64::structures::idt::InterruptDescriptorTable;

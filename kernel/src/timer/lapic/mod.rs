@@ -1,6 +1,6 @@
-pub fn lapic_calibrate() {
+pub fn lapic_calibrate() -> u32 {
     use super::pit::PIT;
-    use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
+    // use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
     let measure_duration: u32 = 10;
     let max_ticks = 0xFFFFFFFF;
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
@@ -15,6 +15,7 @@ pub fn lapic_calibrate() {
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
     LAPICTimer::set_ticks(ticks);
     LAPICTimer::set_active(false);
+    return ticks;
 }
 #[derive(Debug, Copy, Clone)]
 enum LAPICTimerDivideValue {
@@ -29,7 +30,7 @@ enum LAPICTimerDivideValue {
 }
 use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
 use crate::interrupts::InterruptIndexAPIC;
-use crate::serial_println;
+// use crate::{print, serial_println};
 pub struct LAPICTimer {}
 impl LAPICTimer {
     fn set_lvt() {

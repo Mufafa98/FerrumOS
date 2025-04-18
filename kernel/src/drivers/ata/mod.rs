@@ -1,14 +1,10 @@
 extern crate alloc;
 // TODO: what optimizes release and blocks the execution?
-use crate::io::serial;
 use crate::utils::port::*;
-use crate::{hlt_loop, print, println, serial_print, serial_println};
+use crate::{println, serial_println};
 use alloc::format;
 use alloc::vec::Vec;
 use bit_field::BitField;
-use core::arch::asm;
-use core::error;
-use core::task::Poll;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
@@ -52,6 +48,7 @@ enum Status {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct UDMA {
     mode: u8,
 }
@@ -67,7 +64,7 @@ impl UDMA {
         // buf_88 should look like:
         // 0bRXXXXXXX_RXXXXXXX
         let upper = buf_88.get_bits(8..16);
-        let lower = buf_88.get_bits(0..8);
+        let _lower = buf_88.get_bits(0..8);
         let mut mode = 0;
         while upper >> mode & 0b1 == 0 {
             mode += 1;
@@ -75,7 +72,7 @@ impl UDMA {
         UDMA { mode }
     }
 }
-
+#[allow(dead_code)]
 struct ATARegisters {
     data_register: Port<u16>,
     error_register: PortReadOnly<u8>,
@@ -122,7 +119,7 @@ pub enum BusError {
     InvalidBufferSize,
     InvalidBusIdx,
 }
-
+#[allow(dead_code)]
 pub struct Bus {
     id: u8,
     irq: u8,
@@ -343,6 +340,13 @@ impl Bus {
             }
         }
         return setup_result;
+    }
+
+    pub fn get_block(&self, address: u32) -> BlockIndex {
+        if let Some(lba28_adr_sectors) = self.lba28_adr_sectors {
+            return (address / lba28_adr_sectors) as BlockIndex;
+        }
+        0
     }
 }
 

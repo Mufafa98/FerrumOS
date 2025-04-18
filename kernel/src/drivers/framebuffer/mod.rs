@@ -1,5 +1,5 @@
 //! Framebuffer driver for drawing on the screen.
-use crate::{serial_println, utils::custom_types::mut_u8_ptr::MutU8Ptr};
+use crate::utils::custom_types::mut_u8_ptr::MutU8Ptr;
 use lazy_static::lazy_static;
 use limine::request::FramebufferRequest;
 #[used]

@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
-#![feature(const_mut_refs)]
+// #![feature(const_mut_refs)]
 
 extern crate alloc;
 pub mod allocator;
@@ -48,6 +48,7 @@ pub fn init() {
 
     drivers::apic::local_apic::init();
     drivers::apic::io_apic::init();
+    crate::timer::lapic::lapic_calibrate();
 
     drivers::ata::init();
 }

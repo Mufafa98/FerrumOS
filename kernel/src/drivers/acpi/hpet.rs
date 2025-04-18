@@ -6,6 +6,7 @@ pub enum HPETRegisters {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct HPET {
     header: ACPISDTHeader,
     event_timer_block_id: u32,
@@ -54,7 +55,8 @@ impl HPET {
     pub fn set_register(&self, register: HPETRegisters, value: u64) {
         let offset = register as u64;
         let ptr = self.address + offset;
-        unsafe { core::ptr::write_unaligned(ptr as *mut u64, value) }
+        // unsafe { core::ptr::write_unaligned(ptr as *mut u64, value) }
+        unsafe { core::ptr::write_volatile(ptr as *mut u64, value) }
     }
     pub fn get_register(&self, register: HPETRegisters) -> u64 {
         let offset = register as u64;
@@ -70,7 +72,8 @@ impl HPET {
     pub fn set_timer_n_comparator(&self, n: u8, value: u64) {
         let offset = 0x108 + (n as u64) * 0x20;
         let ptr = self.address + offset;
-        unsafe { core::ptr::write_unaligned(ptr as *mut u64, value) }
+        unsafe { core::ptr::write_volatile(ptr as *mut u64, value) }
+        // unsafe { core::ptr::write_unaligned(ptr as *mut u64, value) }
     }
 }
 #[derive(Debug)]

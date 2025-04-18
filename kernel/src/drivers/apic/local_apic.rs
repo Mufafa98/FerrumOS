@@ -1,5 +1,4 @@
 use crate::println;
-use crate::serial_println;
 use crate::utils::msr::*;
 use crate::utils::registers::*;
 static IA32_APIC_BASE_MSR: u32 = 0x1b;

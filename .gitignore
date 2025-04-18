@@ -27,3 +27,5 @@ logs/
 **/*.iso
 **/*.img
 **/*.sh
+**/*.log
+/old

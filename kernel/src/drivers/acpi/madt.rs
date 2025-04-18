@@ -1,5 +1,5 @@
 use super::ACPISDTHeader;
-use crate::{drivers::apic::io_apic::IOAPICStruct, serial_println};
+use crate::drivers::apic::io_apic::IOAPICStruct;
 use alloc::vec::Vec;
 #[allow(dead_code)]
 #[derive(Debug)]
