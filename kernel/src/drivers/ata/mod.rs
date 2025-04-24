@@ -362,6 +362,14 @@ pub fn read(bus: u8, block: BlockIndex, buf: &mut [u8]) -> Result<(), BusError> 
     buses[bus as usize].read(block, buf)
 }
 
+pub fn write(bus: u8, block: BlockIndex, buf: &[u8]) -> Result<(), BusError> {
+    if bus as usize >= BUSES.lock().len() {
+        return Err(BusError::InvalidBusIdx);
+    }
+    let mut buses = BUSES.lock();
+    buses[bus as usize].write(block, buf)
+}
+
 pub fn init() {
     let mut master = Bus::new(0, 0x1F0, 0x3F6, 14);
     if let Err(err) = master.identify(Drive::Master) {

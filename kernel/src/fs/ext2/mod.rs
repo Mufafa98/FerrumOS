@@ -1,8 +1,9 @@
 // use core::result;
+//TODO: Maybe implement some caching and better block alocation
 
 use crate::drivers::*;
-// use crate::io::serial;
 use crate::{serial_print, serial_println};
+use spin::mutex::Mutex;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -15,197 +16,35 @@ use superblock::Superblock;
 mod bgdt;
 use bgdt::BlockGroupDescriptorTable;
 
-#[derive(Debug)]
-#[repr(C)]
-struct Inode {
-    mode: u16,
-    uid: u16,
-    size_low: u32,
-    last_access_time: u32,
-    cretion_time: u32,
-    last_modification_time: u32,
-    deletion_time: u32,
-    group_id: u16,
-    hard_links_count: u16,
-    disk_sectors_count: u32,
-    flags: u32,
-    os_specific: u32,
-    direct_block_pointers: [u32; 12],
-    slightly_indirect_block_pointer: u32,
-    doubly_indirect_block_pointer: u32,
-    triply_indirect_block_pointer: u32,
-    generation_number: u32,
-    file_acl: u32,
-    dir_acl: u32,
-    block_address_fragment: u32,
-    os_specific_2: u32,
-}
-impl Inode {
-    fn from_id(inode_id: usize, sb: &Superblock, bgdt: &BlockGroupDescriptorTable) -> Self {
-        // get he inode size from the superblock
-        // TO DO use expect instead of unwrap
-        let inode_size = sb.get_inode_size();
-        let block_size = (1024 << sb.get_block_size()) as usize;
-        // 1. Calculate group and index
-        let block_group = (inode_id - 1) / sb.get_inodes_per_group();
-        let index = (inode_id - 1) % sb.get_inodes_per_group();
-        // 2. Get the block group descriptor
-        let bg_desc = &bgdt.get_block_group_descriptor(block_group);
-        // 3. Calculate exact location
-        let inode_table_start_block = bg_desc.get_inode_table_start_address();
-        let byte_offset = index * inode_size;
-        let containing_block = byte_offset / block_size;
-        let offset_in_block = byte_offset % block_size;
-        // 4. Read the inode table block
-        let inode_table_offset = inode_table_start_block + containing_block;
-        let read_address = inode_table_offset * block_size + offset_in_block;
-        let read_block = (read_address / 512) as usize;
-        let read_offset = (read_address % 512) as usize;
+mod inode;
+use inode::{Inode, InodeType};
 
-        let inode_struct;
+lazy_static::lazy_static!(
+    static ref SUPERBLOCK: Mutex<Superblock> = Mutex::new(Superblock::new());
 
-        let mut inode_buf = [0u8; 512];
-        let read_result = ata::read(0, read_block as u32, &mut inode_buf);
-        if read_result.is_err() {
-            panic!("Failed to read from disk");
-        }
-        if read_offset + inode_size as usize > 512 {
-            panic!("Works? Inode size is larger than block size {}", inode_id);
-            let mut inode_buf_ext = [0u8; 512];
-            read_result = ata::read(0, (read_block + 1) as u32, &mut inode_buf_ext);
-            if read_result.is_err() {
-                panic!("Failed to read from disk");
-            }
-            let inode_data_1 = &inode_buf[read_offset..];
-            let inode_data_2 = &inode_buf_ext[0..(inode_size as usize - 512 - read_offset)];
-            let mut inode_data = Vec::new();
-            inode_data.extend_from_slice(inode_data_1);
-            inode_data.extend_from_slice(inode_data_2);
-            inode_struct = Inode::try_from_bytes(&inode_data);
-        } else {
-            let inode_data = &inode_buf[read_offset..read_offset + inode_size as usize];
-            inode_struct = Inode::try_from_bytes(&inode_data);
-        }
-        inode_struct
-    }
-    
-    fn try_from_bytes(buf: &[u8]) -> Self {
-        let inode: Inode = unsafe { core::ptr::read(buf.as_ptr() as *const _) };
-        inode
-    }
+    static ref BLOCK_GROUP_DESCRIPTOR_TABLE: Mutex<BlockGroupDescriptorTable> =
+        Mutex::new(BlockGroupDescriptorTable::new());
+);
 
-    fn get_type(&self) -> &str {
-        let file_type = self.mode & 0xF000;
-        match file_type {
-            0x1000 => "FIFO",
-            0x2000 => "Character device",
-            0x4000 => "Directory",
-            0x6000 => "Block device",
-            0x8000 => "Regular file",
-            0xA000 => "Symbolic link",
-            0xC000 => "Unix socket",
-            _ => "Unknown",
-        }
-    }
-
-    fn get_permissions(&self) -> u16 {
-        return self.mode & 0x0FFF;
-    }
-}
-
-fn read_1mb_block(block_number: u32, block_size: u32) -> Vec<u8> {
+pub fn read_1mb_block(block_number: u32, block_size: u32) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
 
     let block_address = block_number * block_size;
-    let block_1 = (block_address / 512) as usize;
+    let block_1 = (block_address / 512);
     let buffer = &mut [0u8; 512];
 
-    let read_result = ata::read(0, block_1 as u32, buffer);
+    let read_result = ata::read(0, block_1, buffer);
     if read_result.is_err() {
         panic!("Failed to read from disk");
     }
     result.extend_from_slice(buffer);
 
-    let read_result = ata::read(0, block_1 as u32 + 1, buffer);
+    let read_result = ata::read(0, block_1 + 1, buffer);
     if read_result.is_err() {
         panic!("Failed to read from disk");
     }
     result.extend_from_slice(buffer);
     result
-}
-
-fn read_direct_block_pointer(block_number: u32, block_size: u32) -> u32 {
-    let buffer = read_1mb_block(block_number, block_size);
-    // buffer_to_string(&buffer);
-    return buffer.len() as u32;
-}
-
-fn read_indirect_block(block_number: u32, block_size: u32) -> u32 {
-    let result: Vec<u8> = read_1mb_block(block_number, block_size);
-    let mut counter = 0;
-    for i in 0..256 {
-        let block_number = u32::from_le_bytes([
-            result[i * 4],
-            result[i * 4 + 1],
-            result[i * 4 + 2],
-            result[i * 4 + 3],
-        ]);
-        if block_number == 0 {
-            //TODO another implementation?
-            continue;
-        }
-        let size = read_direct_block_pointer(block_number, block_size);
-        counter += size;
-    }
-    return counter;
-    // serial_println!(
-    //     "Indirect block number: {} with {} blocks",
-    //     block_number,
-    //     counter
-    // );
-}
-
-fn read_dindirect_block(block_number: u32, block_size: u32) -> u32 {
-    serial_println!("Dindirect block number: {}", block_number);
-    let result: Vec<u8> = read_1mb_block(block_number, block_size);
-    let mut counter = 0;
-    for i in 0..256 {
-        let block_number = u32::from_le_bytes([
-            result[i * 4],
-            result[i * 4 + 1],
-            result[i * 4 + 2],
-            result[i * 4 + 3],
-        ]);
-        if block_number == 0 {
-            //TODO another implementation?
-            continue;
-        }
-        // serial_println!("indirect block number: {}", block_number);
-        let size = read_indirect_block(block_number, block_size);
-        counter += size;
-    }
-    return counter;
-}
-
-fn read_tindirect_block(block_number: u32, block_size: u32) -> u32 {
-    let result: Vec<u8> = read_1mb_block(block_number, block_size);
-    let mut counter = 0;
-    for i in 0..256 {
-        let block_number = u32::from_le_bytes([
-            result[i * 4],
-            result[i * 4 + 1],
-            result[i * 4 + 2],
-            result[i * 4 + 3],
-        ]);
-        // serial_println!("Dindirect block number: {}", block_number);
-        if block_number == 0 {
-            //TODO another implementation?
-            continue;
-        }
-        let size = read_dindirect_block(block_number, block_size);
-        counter += size;
-    }
-    return counter;
 }
 
 fn buffer_to_string(buffer: &[u8]) -> String {
@@ -220,56 +59,386 @@ fn buffer_to_string(buffer: &[u8]) -> String {
     string
 }
 
-fn read_inode_data(inode_struct: &Inode, block_size: u32) {
-    let mut total_size = 0;
-    for block in inode_struct.direct_block_pointers {
-        if block == 0 {
-            //TODO: If the fs supports sparse blocks, implement acordingly
+#[derive(Debug)]
+#[repr(C)]
+struct DirEntry {
+    inode: u32,
+    rec_len: u16,
+    name_len: u8,
+    file_type: u8,
+    name: String,
+    next: usize,
+}
+impl DirEntry {
+    fn from_ptr(data: &[u8], start: usize) -> Self {
+        let inode = u32::from_le_bytes([
+            data[start],
+            data[start + 1],
+            data[start + 2],
+            data[start + 3],
+        ]);
+        let rec_len = u16::from_le_bytes([data[start + 4], data[start + 5]]);
+        let name_len = u8::from_le(data[start + 6]);
+        let file_type = u8::from_le(data[start + 7]);
+        let name =
+            core::str::from_utf8(&data[(start + 8) as usize..(start + 8 + name_len as usize)])
+                .unwrap();
+        DirEntry {
+            inode,
+            rec_len,
+            name_len,
+            file_type,
+            name: String::from(name),
+            next: start + rec_len as usize,
+        }
+    }
+}
+
+// Finds a file in the root directory
+fn find_file_in_dir(file_name: &str, root_inode: Inode) -> Option<DirEntry> {
+    let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+    fn file_in_direct_block(
+        block_number: u32,
+        file_name: &str,
+        block_size: u32,
+    ) -> Option<DirEntry> {
+        if block_number == 0 {
+            return None;
+        }
+        let data = read_1mb_block(block_number, block_size);
+
+        let mut entry = DirEntry::from_ptr(&data, 0);
+        while entry.rec_len != 0 && entry.next < data.len() {
+            if entry.name == file_name {
+                return Some(entry);
+            }
+            entry = DirEntry::from_ptr(&data, entry.next);
+        }
+        if entry.name == file_name {
+            return Some(entry);
+        }
+        None
+    }
+    fn file_in_indirect_block(
+        block_number: u32,
+        file_name: &str,
+        block_size: u32,
+    ) -> Option<DirEntry> {
+        if block_number == 0 {
+            return None;
+        }
+        let data = read_1mb_block(block_number, block_size);
+        for i in 0..256 {
+            let block_number = u32::from_le_bytes([
+                data[i * 4],
+                data[i * 4 + 1],
+                data[i * 4 + 2],
+                data[i * 4 + 3],
+            ]);
+            if let Some(entry) = file_in_direct_block(block_number, file_name, block_size) {
+                return Some(entry);
+            }
+        }
+        None
+    }
+    fn file_in_d_indirect_block(
+        block_number: u32,
+        file_name: &str,
+        block_size: u32,
+    ) -> Option<DirEntry> {
+        if block_number == 0 {
+            return None;
+        }
+        let data = read_1mb_block(block_number, block_size);
+        for i in 0..256 {
+            let block_number = u32::from_le_bytes([
+                data[i * 4],
+                data[i * 4 + 1],
+                data[i * 4 + 2],
+                data[i * 4 + 3],
+            ]);
+            if let Some(entry) = file_in_indirect_block(block_number, file_name, block_size) {
+                return Some(entry);
+            }
+        }
+        None
+    }
+    fn file_in_t_indirect_block(
+        block_number: u32,
+        file_name: &str,
+        block_size: u32,
+    ) -> Option<DirEntry> {
+        if block_number == 0 {
+            return None;
+        }
+        let data = read_1mb_block(block_number, block_size);
+        for i in 0..256 {
+            let block_number = u32::from_le_bytes([
+                data[i * 4],
+                data[i * 4 + 1],
+                data[i * 4 + 2],
+                data[i * 4 + 3],
+            ]);
+            if let Some(entry) = file_in_d_indirect_block(block_number, file_name, block_size) {
+                return Some(entry);
+            }
+        }
+        None
+    }
+
+    for direct_block in root_inode.get_direct_blocks() {
+        if let Some(entry) = file_in_direct_block(*direct_block, file_name, block_size) {
+            return Some(entry);
+        }
+    }
+    if let Some(entry) =
+        file_in_indirect_block(root_inode.get_indirect_block(), file_name, block_size)
+    {
+        return Some(entry);
+    }
+    if let Some(entry) = file_in_d_indirect_block(
+        root_inode.get_doubly_indirect_block(),
+        file_name,
+        block_size,
+    ) {
+        return Some(entry);
+    }
+    if let Some(entry) = file_in_t_indirect_block(
+        root_inode.get_triply_indirect_block(),
+        file_name,
+        block_size,
+    ) {
+        return Some(entry);
+    }
+
+    None
+}
+
+fn find_first_free_block() -> Option<usize> {
+    let blocks_per_group = SUPERBLOCK.lock().get_blocks_per_group();
+    let bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
+    let bgdt_count = bgdt.get_block_group_descriptor_count();
+    for id in 0..bgdt_count {
+        let bg_desc = bgdt.get_block_group_descriptor(id);
+        if bg_desc.get_free_block_count() == 0 {
             continue;
         }
-        let size = read_direct_block_pointer(block, 1024);
-        total_size += size;
-        // buffer_to_string(&data);
+        let block = bg_desc.get_b_bitmap_block();
+        let data = read_1mb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
+        for i in 0..data.len() {
+            let byte = data[i];
+            for j in 0..8 {
+                let control_bit = 0b1 << j;
+                if byte & control_bit == 0 {
+                    return Some((i * 8 + j) + id * blocks_per_group);
+                }
+            }
+        }
     }
-    if inode_struct.slightly_indirect_block_pointer != 0 {
-        total_size += read_indirect_block(inode_struct.slightly_indirect_block_pointer, block_size);
+    return None;
+}
+
+#[derive(Debug)]
+enum FileError {
+    NotFound,
+    NotAFile,
+}
+
+fn find_by_path(path: &str) -> Option<DirEntry> {
+    let path_parts: Vec<&str> = path.split('/').collect();
+    let mut current_path = String::new();
+    let mut current_inode = Inode::from_id(2);
+    let mut counter = 0;
+
+    for part in path_parts.iter() {
+        if part.is_empty() {
+            continue;
+        }
+        if current_inode.get_type() != InodeType::Directory {
+            continue;
+        }
+        current_path.push_str(part);
+        counter += 1;
+
+        if let Some(entry) = find_file_in_dir(current_path.as_str(), current_inode) {
+            current_inode = Inode::from_id(entry.inode as usize);
+            current_path.clear();
+            if counter == path_parts.len() {
+                return Some(entry);
+            }
+        } else {
+            serial_println!("File not found: {}", current_path);
+            return None;
+        }
     }
-    if inode_struct.doubly_indirect_block_pointer != 0 {
-        total_size += read_dindirect_block(inode_struct.doubly_indirect_block_pointer, block_size);
+    serial_println!("File found: {}", current_path);
+    None
+}
+
+struct File {
+    inode: Inode,
+    offset: usize,
+}
+impl File {
+    fn from_path(path: &str) -> Result<Self, FileError> {
+        let entry = find_by_path(path);
+        if entry.is_none() {
+            return Err(FileError::NotFound);
+        }
+        let entry = entry.unwrap();
+        let inode = Inode::from_id(entry.inode as usize);
+        if inode.get_type() != InodeType::RegularFile {
+            return Err(FileError::NotAFile);
+        }
+        Ok(File { inode, offset: 0 })
     }
-    if inode_struct.triply_indirect_block_pointer != 0 {
-        total_size += read_tindirect_block(inode_struct.triply_indirect_block_pointer, block_size);
+
+    fn get_block(&mut self, offset: usize) -> u32 {
+        fn get_block_in_address(address: usize, block_number: usize) -> u32 {
+            let necessary_block_offset = block_number * 4;
+            let read_address = address + necessary_block_offset;
+            let read_block = (read_address / 512);
+            let read_offset = (read_address % 512);
+            let mut inode_buf = [0u8; 512];
+            let read_result = ata::read(0, read_block as u32, &mut inode_buf);
+            if read_result.is_err() {
+                panic!("Failed to read from disk");
+            }
+            let block_number = u32::from_le_bytes([
+                inode_buf[read_offset],
+                inode_buf[read_offset + 1],
+                inode_buf[read_offset + 2],
+                inode_buf[read_offset + 3],
+            ]);
+            return block_number;
+        }
+
+        let block_size = SUPERBLOCK.lock().get_block_size() as usize;
+        let addresses_per_block = block_size / 4;
+        let mut block_number = offset / block_size;
+        if block_number < 12 {
+            let block_number = self.inode.get_direct_block(block_number);
+            return block_number;
+        }
+        block_number -= 12;
+        if block_number < addresses_per_block {
+            let indirect_block_address = self.inode.get_indirect_block() as usize * block_size;
+            let block_number = get_block_in_address(indirect_block_address, block_number);
+            return block_number;
+        }
+        block_number -= addresses_per_block;
+        if block_number < addresses_per_block * addresses_per_block {
+            let inidrect_block = block_number / addresses_per_block;
+            let direct_block = block_number % addresses_per_block;
+
+            let dindirect_block_address =
+                self.inode.get_doubly_indirect_block() as usize * block_size;
+
+            let indirect_block = get_block_in_address(dindirect_block_address, inidrect_block);
+            let indirect_block_address = indirect_block as usize * block_size;
+
+            let direct_block = get_block_in_address(indirect_block_address, direct_block);
+
+            return direct_block;
+        }
+        block_number -= addresses_per_block * addresses_per_block;
+        if block_number < addresses_per_block * addresses_per_block * addresses_per_block {
+            let dindirect_block = block_number / addresses_per_block / addresses_per_block;
+            let indirect_block = block_number / addresses_per_block % addresses_per_block;
+            let direct_block = block_number % addresses_per_block;
+
+            let tindirect_block_address =
+                self.inode.get_triply_indirect_block() as usize * block_size;
+            let dindirect_block = get_block_in_address(tindirect_block_address, dindirect_block);
+            let dindirect_block_address = dindirect_block as usize * block_size;
+            let indirect_block = get_block_in_address(dindirect_block_address, indirect_block);
+            let indirect_block_address = indirect_block as usize * block_size;
+            let direct_block = get_block_in_address(indirect_block_address, direct_block);
+
+            return direct_block;
+        }
+        0
     }
-    serial_println!(
-        "Total size of inode {:?} is {} bytes",
-        inode_struct,
-        total_size
-    );
+
+    fn read(&mut self, buffer: &mut [u8], size: usize) -> usize {
+        let mut bytes_read = 0;
+        while bytes_read < size {
+            let current_block = self.get_block(self.offset);
+            if current_block == 0 {
+                break;
+            }
+            let block_size = SUPERBLOCK.lock().get_block_size() as usize;
+            // lazy version.. read the whole block
+            let data = read_1mb_block(current_block, block_size as u32);
+            let current_block_offset = self.offset % block_size;
+            let mut current_iter_counter = 0;
+            for i in current_block_offset..data.len() {
+                if bytes_read >= size {
+                    break;
+                }
+                buffer[bytes_read] = data[i];
+                bytes_read += 1;
+                current_iter_counter += 1;
+            }
+            self.offset += current_iter_counter;
+        }
+        bytes_read
+    }
+
+    fn seek(&mut self, offset: usize) {
+        if offset > self.inode.get_size() as usize {
+            panic!("Error: seek out of bounds");
+        }
+        self.offset = offset;
+    }
+}
+
+fn offset_to_block(offset: usize, addresses_per_block: usize) {
+    // let addresses_per_block = block_size;
+    let mut block_number = offset / addresses_per_block;
+    if block_number < 12 {
+        return;
+    }
+    block_number -= 12;
+    if block_number < addresses_per_block {
+        return;
+    }
+    block_number -= addresses_per_block;
+    if block_number < addresses_per_block * addresses_per_block {
+        let inidrect_block = block_number / addresses_per_block;
+        let direct_block = block_number % addresses_per_block;
+        return;
+    }
+    block_number -= addresses_per_block * addresses_per_block;
+    if block_number < addresses_per_block * addresses_per_block * addresses_per_block {
+        let dindirect_block = block_number / addresses_per_block / addresses_per_block;
+        let indirect_block = block_number / addresses_per_block % addresses_per_block;
+        let direct_block = block_number % addresses_per_block;
+        return;
+    }
+    serial_println!("Error: block {} is too large", offset / addresses_per_block);
 }
 
 pub fn init() {
-    let mut buf = [0u8; 512];
-    let mut read_result = ata::read(0, 2, &mut buf);
-    // LBA 3 does not contain any relevant information
-    if read_result.is_err() {
-        panic!("Failed to read from disk");
+    // BLOCK_GROUP_DESCRIPTOR_TABLE.lock().flush();
+    // SUPERBLOCK.lock().changesth();
+    // SUPERBLOCK.lock().flush();
+    // let next_free_block = find_first_free_block();
+    // serial_println!("Next free block: {:?}", next_free_block);
+    // serial_println!("sss {:?}", temp);
+    let test_file = File::from_path("1234");
+    if test_file.is_err() {
+        panic!("Error at creating file {:?}", test_file.err());
     }
-
-    let sb = Superblock::try_from_bytes(&buf);
-    // serial_println!("{:?}", sb);
-
-    let mut data: Vec<u8> = Vec::new();
-    for lba in 4..=5 {
-        read_result = ata::read(0, lba, &mut buf);
-        if read_result.is_err() {
-            panic!("Failed to read from disk");
+    let mut test_file = test_file.unwrap();
+    let mut buffer = [0u8; 512];
+    loop {
+        let bytes_read = test_file.read(&mut buffer, 512);
+        // serial_println!("Read {} bytes", bytes_read);
+        if bytes_read == 0 {
+            break;
         }
-        data.extend_from_slice(&buf);
+        buffer_to_string(&buffer);
     }
-
-    let bgdt = BlockGroupDescriptorTable::try_from_bytes(&data, sb.get_block_group_count());
-    // let inode_struct = get_inode(16, sb, bgdt);
-    // let inode_struct = get_inode(16, &sb, &bgdt);
-    let inode_struct = Inode::from_id(16, &sb, &bgdt);
-    read_inode_data(&inode_struct, 1024 << sb.get_block_size());
+    serial_println!()
 }
