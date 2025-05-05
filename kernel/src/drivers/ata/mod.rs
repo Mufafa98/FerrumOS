@@ -237,7 +237,7 @@ impl Bus {
             }
 
             self.udma = Some(UDMA::from_ibf(buf[88]));
-
+            //TODO: Rename lba32 into lba28
             let mut lba32 = 0;
             lba32 |= (buf[61] as u32) << 16;
             lba32 |= (buf[60] as u32) << 0;
@@ -336,9 +336,11 @@ impl Bus {
                 data.set_bits(8..16, buf[i * 2 + 1] as u16);
 
                 self.write_data(data);
-                self.write_command(Command::CacheFlush);
+                // Should flush be here?? Maybe not
             }
         }
+        self.write_command(Command::CacheFlush);
+        while self.is_busy() {}
         return setup_result;
     }
 

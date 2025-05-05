@@ -46,10 +46,14 @@ pub fn init() {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init() };
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
+    let kernel_address = KERNEL_ADDRESS_REQUEST.get_response().expect("nu merge");
+    // println!("Kernel phys address: {:#X}", kernel_address.physical_base());
+    serial_println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
+    println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
+
     drivers::apic::local_apic::init();
     drivers::apic::io_apic::init();
     crate::timer::lapic::lapic_calibrate();
-
     drivers::ata::init();
 }
 

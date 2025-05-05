@@ -21,7 +21,7 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 unsafe extern "C" fn _start() -> ! {
     ferrum_os::init();
     welcome();
-    
+
     // serial_println!("Testing");
     // hpet();
     // serial_println!("Done");

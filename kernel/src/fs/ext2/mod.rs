@@ -1,7 +1,8 @@
-// use core::result;
-//TODO: Maybe implement some caching and better block alocation
+use core::cmp::min;
+use core::usize;
 
-use crate::drivers::*;
+//TODO: Implement last time write updates
+use crate::{drivers::*, print};
 use crate::{serial_print, serial_println};
 use spin::mutex::Mutex;
 
@@ -26,25 +27,124 @@ lazy_static::lazy_static!(
         Mutex::new(BlockGroupDescriptorTable::new());
 );
 
+fn test_read1k() {
+    let data = &include_bytes!("../../../../di_128M.img");
+    for block in 0..1024 {
+        let read_data = read_1mb_block(block, 1024);
+        for i in 0..1024 {
+            if data[(block * 1024 + i) as usize] != read_data[i as usize] {
+                serial_println!("Plang at {}", i);
+            }
+        }
+    }
+    serial_println!("Read test passed");
+}
+
+fn test_write1k() {
+    for i in 0..1024 {
+        let old_data = read_1mb_block(i, 1024);
+        let garbage = [12u8; 1024];
+        write_1mb_block(i, 1024, &garbage, garbage.len());
+        let result = read_1mb_block(i, 1024);
+        for j in 0..1024 {
+            if garbage[j] != result[j] {
+                serial_println!("Plang at {}", j);
+            }
+        }
+        write_1mb_block(i, 1024, &old_data, old_data.len());
+        let result = read_1mb_block(i, 1024);
+        for j in 0..1024 {
+            if old_data[j] != result[j] {
+                serial_println!("Plang at {} after final write", j);
+            }
+        }
+    }
+    serial_println!("Write test passed");
+}
+
+fn test_read() {
+    let data = &include_bytes!("../../../../let");
+    let mut test_file = File::from_path("let").unwrap();
+    let mut counter = 0;
+    loop {
+        let mut buffer = [0u8; 1024];
+        let bytes_read = test_file.read(&mut buffer, 1024);
+        if bytes_read == 0 {
+            break;
+        }
+        // buffer_to_string(&buffer);
+        for i in 0..bytes_read {
+            if data[counter] != buffer[i] {
+                serial_println!(
+                    "Plang at {} {} {}",
+                    counter,
+                    data[counter] as char,
+                    buffer[i] as char
+                );
+            }
+            counter += 1;
+        }
+    }
+    serial_println!("Read test passed");
+}
+
+fn print_hex(buffer: &[u8]) {
+    for i in 0..buffer.len() {
+        if i % 16 == 0 {
+            serial_println!();
+        }
+        serial_print!("{:02X} ", buffer[i]);
+    }
+}
+
 pub fn read_1mb_block(block_number: u32, block_size: u32) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
 
     let block_address = block_number * block_size;
-    let block_1 = (block_address / 512);
+    let block_1 = block_address / 512;
+    let block_2 = block_1 + 1;
     let buffer = &mut [0u8; 512];
 
     let read_result = ata::read(0, block_1, buffer);
     if read_result.is_err() {
-        panic!("Failed to read from disk");
+        serial_println!("Failed to read from disk. Error {:?}", read_result.err());
     }
     result.extend_from_slice(buffer);
 
-    let read_result = ata::read(0, block_1 + 1, buffer);
+    let read_result = ata::read(0, block_2, buffer);
     if read_result.is_err() {
-        panic!("Failed to read from disk");
+        serial_println!("Failed to read from disk. Error {:?}", read_result.err());
     }
     result.extend_from_slice(buffer);
     result
+}
+
+pub fn write_1mb_block(block_number: u32, block_size: u32, buffer: &[u8], size: usize) {
+    if size != 1024 {
+        serial_println!("Buffer len should be 1024");
+        return;
+    }
+    let block_address = block_number * block_size;
+    let block_1 = block_address / 512;
+    let block_2 = block_1 + 1;
+
+    let data_1 = &buffer[0..512];
+    let data_2 = &buffer[512..1024];
+
+    let write_result = ata::write(0, block_1, &data_1);
+    if write_result.is_err() {
+        serial_println!(
+            "Failed to write first part of data on disk {:?}",
+            write_result.err()
+        );
+    }
+    let write_result = ata::write(0, block_2, &data_2);
+    if write_result.is_err() {
+        serial_println!(
+            "Failed to write second part of data on disk {:?}",
+            write_result.err()
+        );
+    }
 }
 
 fn buffer_to_string(buffer: &[u8]) -> String {
@@ -214,30 +314,6 @@ fn find_file_in_dir(file_name: &str, root_inode: Inode) -> Option<DirEntry> {
     None
 }
 
-fn find_first_free_block() -> Option<usize> {
-    let blocks_per_group = SUPERBLOCK.lock().get_blocks_per_group();
-    let bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
-    let bgdt_count = bgdt.get_block_group_descriptor_count();
-    for id in 0..bgdt_count {
-        let bg_desc = bgdt.get_block_group_descriptor(id);
-        if bg_desc.get_free_block_count() == 0 {
-            continue;
-        }
-        let block = bg_desc.get_b_bitmap_block();
-        let data = read_1mb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
-        for i in 0..data.len() {
-            let byte = data[i];
-            for j in 0..8 {
-                let control_bit = 0b1 << j;
-                if byte & control_bit == 0 {
-                    return Some((i * 8 + j) + id * blocks_per_group);
-                }
-            }
-        }
-    }
-    return None;
-}
-
 #[derive(Debug)]
 enum FileError {
     NotFound,
@@ -247,7 +323,7 @@ enum FileError {
 fn find_by_path(path: &str) -> Option<DirEntry> {
     let path_parts: Vec<&str> = path.split('/').collect();
     let mut current_path = String::new();
-    let mut current_inode = Inode::from_id(2);
+    let mut current_inode = Inode::from_id_no_flush(2);
     let mut counter = 0;
 
     for part in path_parts.iter() {
@@ -261,7 +337,7 @@ fn find_by_path(path: &str) -> Option<DirEntry> {
         counter += 1;
 
         if let Some(entry) = find_file_in_dir(current_path.as_str(), current_inode) {
-            current_inode = Inode::from_id(entry.inode as usize);
+            current_inode = Inode::from_id_no_flush(entry.inode as usize);
             current_path.clear();
             if counter == path_parts.len() {
                 return Some(entry);
@@ -271,7 +347,7 @@ fn find_by_path(path: &str) -> Option<DirEntry> {
             return None;
         }
     }
-    serial_println!("File found: {}", current_path);
+    serial_println!("File found: {}", path);
     None
 }
 
@@ -302,7 +378,7 @@ impl File {
             let mut inode_buf = [0u8; 512];
             let read_result = ata::read(0, read_block as u32, &mut inode_buf);
             if read_result.is_err() {
-                panic!("Failed to read from disk");
+                serial_println!("Failed to read from disk . Error {:?}", read_result.err());
             }
             let block_number = u32::from_le_bytes([
                 inode_buf[read_offset],
@@ -360,21 +436,30 @@ impl File {
         0
     }
 
-    fn read(&mut self, buffer: &mut [u8], size: usize) -> usize {
+    fn old_read(&mut self, buffer: &mut [u8], size: usize) -> usize {
         let mut bytes_read = 0;
-        while bytes_read < size {
+        let start_offset = self.offset;
+        let block_size = SUPERBLOCK.lock().get_block_size();
+        let file_size = self.inode.get_size();
+        loop {
+            if bytes_read >= size {
+                break;
+            }
+            if self.offset >= file_size {
+                break;
+            }
             let current_block = self.get_block(self.offset);
             if current_block == 0 {
                 break;
             }
-            let block_size = SUPERBLOCK.lock().get_block_size() as usize;
-            // lazy version.. read the whole block
+
             let data = read_1mb_block(current_block, block_size as u32);
             let current_block_offset = self.offset % block_size;
             let mut current_iter_counter = 0;
+
             for i in current_block_offset..data.len() {
-                if bytes_read >= size {
-                    break;
+                if start_offset + bytes_read >= file_size || bytes_read >= size || data[i] == 0 {
+                    return bytes_read;
                 }
                 buffer[bytes_read] = data[i];
                 bytes_read += 1;
@@ -383,6 +468,119 @@ impl File {
             self.offset += current_iter_counter;
         }
         bytes_read
+    }
+
+    fn read(&mut self, buffer: &mut [u8], size: usize) -> usize {
+        let block_size = SUPERBLOCK.lock().get_block_size();
+        let file_size = self.inode.get_size();
+
+        let actual_size = min(buffer.len(), size);
+        let mut bytes_read = 0;
+
+        while bytes_read < actual_size && self.offset < file_size {
+            let block = self.get_block(self.offset);
+            let block_offset = self.offset % block_size;
+            let bytes_avail_in_block = block_size - block_offset;
+            let bytes_until_eof = file_size - self.offset;
+            let bytes_needed = min(
+                actual_size - bytes_read,
+                min(bytes_avail_in_block, bytes_until_eof),
+            );
+
+            if block == 0 {
+                break;
+            }
+
+            let data = read_1mb_block(block, block_size as u32);
+
+            buffer[bytes_read..(bytes_read + bytes_needed)]
+                .copy_from_slice(&data[block_offset..(block_offset + bytes_needed)]);
+            bytes_read += bytes_needed;
+            self.offset += bytes_needed;
+        }
+        bytes_read
+    }
+
+    fn old_write(&mut self, buffer: &[u8], size: usize) -> usize {
+        let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+        let mut bytes_written = 0;
+
+        while bytes_written < size {
+            let mut current_block = self.get_block(self.offset);
+            if current_block == 0 {
+                serial_println!("\nNeed to allocate new block");
+                if let Some(block) = self.inode.allocate_new_block() {
+                    current_block = block;
+                } else {
+                    serial_println!("Something wrong happened at block alocation in write");
+                    return bytes_written;
+                }
+            }
+
+            let mut data = read_1mb_block(current_block, block_size);
+            let current_block_offset = self.offset % block_size as usize;
+
+            for pos in current_block_offset..data.len() {
+                if bytes_written >= size {
+                    break;
+                }
+                data[pos] = buffer[bytes_written];
+                bytes_written += 1;
+                self.offset += 1;
+            }
+            // serial_println!(
+            //     "\nWriting {} bytes to block {} with offset {}",
+            //     bytes_written,
+            //     current_block,
+            //     self.offset
+            // );
+            // buffer_to_string(&data);
+            // write_1mb_block(current_block, block_size, &data, data.len());
+        }
+        if self.offset >= self.inode.get_size() {
+            self.inode.set_size(self.offset);
+        }
+        bytes_written
+    }
+
+    fn write(&mut self, buffer: &[u8], size: usize) -> usize {
+        //NOTE: MISSING BLOCK??????
+        let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+        let mut bytes_written = 0;
+        let mut temp = 0;
+
+        while bytes_written < size {
+            let mut current_block = self.get_block(self.offset);
+            if current_block == 0 {
+                serial_println!("\nNeed to allocate new block");
+                if let Some(block) = self.inode.allocate_new_block() {
+                    current_block = block;
+                } else {
+                    serial_println!("Something wrong happened at block alocation in write");
+                    return bytes_written;
+                }
+            }
+
+            let mut data = read_1mb_block(current_block, block_size);
+            let current_block_offset = self.offset % block_size as usize;
+
+            for pos in current_block_offset..data.len() {
+                if bytes_written >= size {
+                    break;
+                }
+                data[pos] = buffer[bytes_written];
+                bytes_written += 1;
+                self.offset += 1;
+            }
+            temp += 1;
+            serial_println!("Current Block {}", current_block);
+            write_1mb_block(current_block, block_size, &data, data.len());
+        }
+        if self.offset >= self.inode.get_size() {
+            self.inode.set_size(self.offset);
+        }
+        // bytes_written
+        temp as usize
     }
 
     fn seek(&mut self, offset: usize) {
@@ -418,27 +616,52 @@ fn offset_to_block(offset: usize, addresses_per_block: usize) {
     }
     serial_println!("Error: block {} is too large", offset / addresses_per_block);
 }
-
+//NOTE: asd
 pub fn init() {
-    // BLOCK_GROUP_DESCRIPTOR_TABLE.lock().flush();
-    // SUPERBLOCK.lock().changesth();
-    // SUPERBLOCK.lock().flush();
-    // let next_free_block = find_first_free_block();
-    // serial_println!("Next free block: {:?}", next_free_block);
-    // serial_println!("sss {:?}", temp);
+    // let tmp = Inode::from_id(12);
+    // tmp.list_blocks();
+    // let tmp = Inode::from_id(13);
+    // tmp.list_blocks();
+    // return;
     let test_file = File::from_path("1234");
+    let lorem_ipsum = File::from_path("let");
+
     if test_file.is_err() {
         panic!("Error at creating file {:?}", test_file.err());
     }
+    if lorem_ipsum.is_err() {
+        panic!("Error at creating file {:?}", lorem_ipsum.err());
+    }
+
+    let mut lorem_ipsum = lorem_ipsum.unwrap();
     let mut test_file = test_file.unwrap();
-    let mut buffer = [0u8; 512];
+
+    let mut written = 0;
+    let mut readen = 0;
+    let bytes_written = 0;
+    let mut temp = 0;
     loop {
-        let bytes_read = test_file.read(&mut buffer, 512);
-        // serial_println!("Read {} bytes", bytes_read);
+        let mut buffer = [0u8; 1024];
+        let bytes_read = lorem_ipsum.read(&mut buffer, 1024);
         if bytes_read == 0 {
             break;
         }
-        buffer_to_string(&buffer);
+        // buffer_to_string(&buffer);
+        // serial_println!("Read {} bytes", bytes_read);
+        let bytes_written = test_file.write(&buffer, bytes_read);
+
+        written += bytes_written;
+        readen += bytes_read;
+        temp += 1;
     }
-    serial_println!()
+
+    serial_println!("\nDone writing {} bytes of {} {}\n", written, readen, temp);
+
+    test_file.seek(0);
+    let mut buffer = [0u8; 1024];
+    while test_file.read(&mut buffer, 1024) != 0 {
+        for i in 0..1024 {
+            serial_print!("{}", buffer[i] as char);
+        }
+    }
 }

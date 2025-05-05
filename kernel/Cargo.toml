@@ -3,9 +3,13 @@ name = "ferrum_os"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+debug = 2
+
 [dependencies]
 # limine = "0.2"
 limine = "0.3.1"
+# limine = "0.4.0"
 spin = "0.9"
 x86_64 = "0.15.2"
 ansi_rgb = "0.2.0"

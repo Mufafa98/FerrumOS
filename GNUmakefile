@@ -7,7 +7,7 @@ override IMAGE_NAME := ferrum_os
 # Resolution -g 
 override DISPLAY_TECH := -display gtk -vga vmware 
 # Needed for serial output to work.
-override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio 
+override DEBUG_PARAMS := -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio
 
 override INTERRUPT_PARAMS := -d int -D qemu_interrupts.log
 
@@ -32,7 +32,8 @@ endif
 
 .PHONY: run
 run: $(IMAGE_NAME).iso
-	qemu-system-x86_64 $(MACHINE) -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS)
+	qemu-system-x86_64 $(MACHINE) -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS) 
+	# qemu-system-x86_64 $(MACHINE) -m 2G -cdrom $(IMAGE_NAME).iso -boot d $(CUSTOM_PARAMS) -gdb tcp::26000 -S
 
 .PHONY: check
 check:

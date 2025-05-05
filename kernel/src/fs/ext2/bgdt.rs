@@ -38,6 +38,9 @@ impl BlockGroupDescriptor {
         }
         current_data
     }
+    pub fn set_free_block_count(&mut self, new_value: u16) {
+        self.free_blocks_count = new_value;
+    }
 }
 
 #[derive(Debug)]
@@ -76,6 +79,9 @@ impl BlockGroupDescriptorTable {
     pub fn get_block_group_descriptor(&self, index: usize) -> &BlockGroupDescriptor {
         &self.block_group_descriptors[index]
     }
+    pub fn get_block_group_descriptor_as_mut(&mut self, index: usize) -> &mut BlockGroupDescriptor {
+        &mut self.block_group_descriptors[index]
+    }
     unsafe fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         for bgd in &self.block_group_descriptors {
@@ -90,6 +96,7 @@ impl BlockGroupDescriptorTable {
         bytes
     }
     pub fn flush(&self) {
+        use crate::drivers::ata;
         use crate::serial_println;
         //TODO Remove?
         unsafe {
@@ -118,6 +125,21 @@ impl BlockGroupDescriptorTable {
                     disk_data[i] = self_data[i];
                     write_flag = true;
                 }
+            }
+            if write_flag {
+                let write_buf = &disk_data[0..512];
+                let write_result = ata::write(0, 4, &write_buf);
+                if write_result.is_err() {
+                    panic!("Failed to write to disk");
+                }
+                let write_buf = &disk_data[512..1024];
+                let write_result = ata::write(0, 5, &write_buf);
+                if write_result.is_err() {
+                    panic!("Failed to write to disk");
+                }
+                serial_println!("Block Group Descriptor Table flushed to disk");
+            } else {
+                serial_println!("No changes to Block Group Descriptor Table, not flushing to disk");
             }
         }
     }

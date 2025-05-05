@@ -182,4 +182,16 @@ impl Superblock {
             }
         }
     }
+
+    pub fn get_free_blocks(&self) -> u32 {
+        self.base.free_blocks_count
+    }
+
+    pub fn set_free_blocks(&mut self, new_value: u32) {
+        self.base.free_blocks_count = new_value;
+    }
+
+    pub fn get_first_free_data_block(&self) -> u32 {
+        return self.base.superblock_block_number;
+    }
 }
