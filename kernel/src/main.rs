@@ -3,10 +3,8 @@
 
 use alloc::string::{String, ToString};
 use ferrum_os::*;
-use io::serial;
 use task::{executor, keyboard, Task};
 use timer::Time;
-use utils::registers::{inb, outb};
 
 extern crate alloc;
 
@@ -101,8 +99,6 @@ async fn _async_world() {
         println!("World from async_world");
     }
 }
-
-use core::{arch::asm, char, pin::Pin, time};
 
 fn _heap_test_debug() {
     use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};

@@ -1,14 +1,7 @@
 // If UB appears search for
 // ---------------- Optimization ----------------
 
-use crate::drivers::ata;
-use crate::fs::ext2::{
-    print_hex, read_1mb_block, write_1mb_block, BLOCK_GROUP_DESCRIPTOR_TABLE, SUPERBLOCK,
-};
-use alloc::vec::Vec;
-
-use crate::fs::ext2::BlockGroupDescriptorTable;
-use crate::fs::ext2::Superblock;
+use crate::fs::ext2::{read_1kb_block, write_1kb_block, BLOCK_GROUP_DESCRIPTOR_TABLE, SUPERBLOCK};
 
 use crate::serial_println;
 
@@ -55,7 +48,7 @@ struct InodeBaseFields {
     flags: u32,
     os_specific: u32,
     direct_block_pointers: [u32; 12],
-    slightly_indirect_block_pointer: u32,
+    indirect_block_pointer: u32,
     doubly_indirect_block_pointer: u32,
     triply_indirect_block_pointer: u32,
     generation_number: u32,
@@ -78,7 +71,7 @@ impl InodeBaseFields {
 }
 
 fn find_first_free_block() -> Option<u32> {
-    use super::read_1mb_block;
+    use super::read_1kb_block;
     let blocks_per_group = SUPERBLOCK.lock().get_blocks_per_group();
     let first_free_block = SUPERBLOCK.lock().get_first_free_data_block() as usize;
     let bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
@@ -89,7 +82,7 @@ fn find_first_free_block() -> Option<u32> {
             continue;
         }
         let block = bg_desc.get_b_bitmap_block();
-        let data = read_1mb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
+        let data = read_1kb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
         // serial_println!("Block address phys {:#X}", block * 1024);
         for i in 0..data.len() {
             let byte = data[i];
@@ -124,16 +117,16 @@ fn mark_block_as_used(block_number: usize) {
     };
     let block_number = block_number - 1;
     let block_group_id = block_number / blocks_per_group;
-    let block_byte = (block_number % blocks_per_group / 8);
-    let block_bit = (block_number % blocks_per_group % 8);
+    let block_byte = block_number % blocks_per_group / 8;
+    let block_bit = block_number % blocks_per_group % 8;
     let mut bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
     let bgd = bgdt.get_block_group_descriptor_as_mut(block_group_id);
     let b_map_block = bgd.get_b_bitmap_block();
-    let mut data = read_1mb_block(b_map_block as u32, block_size as u32);
+    let mut data = read_1kb_block(b_map_block as u32, block_size as u32);
     let to_modify = data[block_byte];
     let after = to_modify | (1 << block_bit);
     data[block_byte] = after;
-    write_1mb_block(b_map_block as u32, block_size as u32, &data, data.len());
+    write_1kb_block(b_map_block as u32, block_size as u32, &data, data.len());
     let bgdt_block_update = bgd.get_free_block_count() + 1;
     let sb_block_update = SUPERBLOCK.lock().get_free_blocks() + 1;
     bgd.set_free_block_count(bgdt_block_update as u16);
@@ -175,7 +168,7 @@ impl Inode {
         let offset_in_block = byte_offset % block_size;
         let inode_table_offset = inode_table_start_block + containing_block;
         // 3. Read the inode table block
-        let data = super::read_1mb_block(inode_table_offset as u32, block_size as u32);
+        let data = super::read_1kb_block(inode_table_offset as u32, block_size as u32);
         let ndata = &data[offset_in_block..offset_in_block + inode_size];
         let inode_base = InodeBaseFields::new(&ndata);
         Inode {
@@ -204,7 +197,7 @@ impl Inode {
         data_block: u32,
     ) -> Option<u32> {
         // Read the direct block
-        let mut data = read_1mb_block(block_to_write_in, block_size);
+        let mut data = read_1kb_block(block_to_write_in, block_size);
         for byte_pos in 0..data.len() / 4 {
             // Construct the new block address
             let byte_pos = byte_pos * 4;
@@ -225,8 +218,8 @@ impl Inode {
                 data[byte_pos + 2] = ((data_block >> 16) & 0xFF) as u8;
                 data[byte_pos + 3] = ((data_block >> 24) & 0xFF) as u8;
 
-                write_1mb_block(block_to_write_in, block_size, &data, data.len());
-                let test = read_1mb_block(block_to_write_in, block_size);
+                write_1kb_block(block_to_write_in, block_size, &data, data.len());
+                let test = read_1kb_block(block_to_write_in, block_size);
                 serial_println!("Block address to write:{} {:?}", block_to_write_in, test);
                 return Some(data_block);
             }
@@ -244,7 +237,7 @@ impl Inode {
     ) -> Option<u32> {
         // Read the indirect block
         let mut direct_block = data_block;
-        let mut data = read_1mb_block(block_to_write_in, block_size);
+        let mut data = read_1kb_block(block_to_write_in, block_size);
         for byte_pos in 0..data.len() / 4 {
             // Construct the new block address
             let byte_pos = byte_pos * 4;
@@ -275,7 +268,7 @@ impl Inode {
                 data[byte_pos + 1] = ((data_block >> 8) & 0xFF) as u8;
                 data[byte_pos + 2] = ((data_block >> 16) & 0xFF) as u8;
                 data[byte_pos + 3] = ((data_block >> 24) & 0xFF) as u8;
-                write_1mb_block(block_to_write_in, block_size, &data, data.len());
+                write_1kb_block(block_to_write_in, block_size, &data, data.len());
                 block = data_block;
                 direct_block = find_first_free_block().unwrap();
             }
@@ -297,7 +290,7 @@ impl Inode {
     ) -> Option<u32> {
         // Read the indirect block
         let mut indirect_block = data_block;
-        let mut data = read_1mb_block(block_to_write_in, block_size);
+        let mut data = read_1kb_block(block_to_write_in, block_size);
         for byte_pos in 0..data.len() / 4 {
             // Construct the new block address
             let byte_pos = byte_pos * 4;
@@ -328,7 +321,7 @@ impl Inode {
                 data[byte_pos + 1] = ((data_block >> 8) & 0xFF) as u8;
                 data[byte_pos + 2] = ((data_block >> 16) & 0xFF) as u8;
                 data[byte_pos + 3] = ((data_block >> 24) & 0xFF) as u8;
-                write_1mb_block(block_to_write_in, block_size, &data, data.len());
+                write_1kb_block(block_to_write_in, block_size, &data, data.len());
                 block = data_block;
                 indirect_block = find_first_free_block().unwrap();
             }
@@ -345,7 +338,7 @@ impl Inode {
 
     fn alloc_on_direct_block(&mut self, data_block: u32) -> Option<u32> {
         // ---------------- Optimization ----------------
-        if self.base.slightly_indirect_block_pointer != 0 {
+        if self.base.indirect_block_pointer != 0 {
             return None;
         }
         // ---------------- Optimization ----------------
@@ -376,17 +369,17 @@ impl Inode {
         // if indirect block does not exists, mark the current block as used
         // and request a new block
         let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-        let indirect_block = self.base.slightly_indirect_block_pointer;
+        let indirect_block = self.base.indirect_block_pointer;
         let mut direct_block = data_block;
 
         if indirect_block == 0 {
-            self.base.slightly_indirect_block_pointer = data_block as u32;
+            self.base.indirect_block_pointer = data_block as u32;
             mark_block_as_used(data_block as usize);
             direct_block = find_first_free_block().unwrap();
         }
 
         self.alloc_address_in_direct_block(
-            self.base.slightly_indirect_block_pointer,
+            self.base.indirect_block_pointer,
             block_size,
             direct_block as u32,
         )
@@ -455,20 +448,20 @@ impl Inode {
         return None;
     }
 
-    pub fn list_blocks(&self) {
-        use super::read_1mb_block;
+    fn list_blocks(&self) {
+        use super::read_1kb_block;
         for i in 0..12 {
             let block = self.base.direct_block_pointers[i];
             if block != 0 {
                 serial_println!("Direct block {}: {}", i, block);
             }
         }
-        let block = self.base.slightly_indirect_block_pointer;
+        let block = self.base.indirect_block_pointer;
         if block != 0 {
             serial_println!("Slightly indirect block: {}", block);
         }
         fn list_ind(block: u32) {
-            let data = read_1mb_block(block, 1024);
+            let data = read_1kb_block(block, 1024);
             for i in 0..data.len() / 4 {
                 let byte_pos = i * 4;
                 let block = u32::from_le_bytes([
@@ -483,7 +476,7 @@ impl Inode {
             }
         }
         fn list_dind(block: u32) {
-            let data = read_1mb_block(block, 1024);
+            let data = read_1kb_block(block, 1024);
             for i in 0..data.len() / 4 {
                 let byte_pos = i * 4;
                 let block = u32::from_le_bytes([
@@ -499,7 +492,7 @@ impl Inode {
             }
         }
         fn list_tind(block: u32) {
-            let data = read_1mb_block(block, 1024);
+            let data = read_1kb_block(block, 1024);
             for i in 0..data.len() / 4 {
                 let byte_pos = i * 4;
                 let block = u32::from_le_bytes([
@@ -528,6 +521,81 @@ impl Inode {
         serial_println!("End of blocks");
     }
 
+    fn count_blocks(&self) -> u32 {
+        use super::read_1kb_block;
+        fn list_ind(block: u32) -> u32 {
+            let mut count = 0;
+            let data = read_1kb_block(block, 1024);
+            for i in 0..data.len() / 4 {
+                let byte_pos = i * 4;
+                let block = u32::from_le_bytes([
+                    data[byte_pos],
+                    data[byte_pos + 1],
+                    data[byte_pos + 2],
+                    data[byte_pos + 3],
+                ]);
+                if block != 0 {
+                    count += 1;
+                }
+            }
+            count
+        }
+        fn list_dind(block: u32) -> u32 {
+            let mut count = 0;
+            let data = read_1kb_block(block, 1024);
+            for i in 0..data.len() / 4 {
+                let byte_pos = i * 4;
+                let block = u32::from_le_bytes([
+                    data[byte_pos],
+                    data[byte_pos + 1],
+                    data[byte_pos + 2],
+                    data[byte_pos + 3],
+                ]);
+                if block != 0 {
+                    count += 1 + list_ind(block);
+                }
+            }
+            count
+        }
+        fn list_tind(block: u32) -> u32 {
+            let mut count = 0;
+            let data = read_1kb_block(block, 1024);
+            for i in 0..data.len() / 4 {
+                let byte_pos = i * 4;
+                let block = u32::from_le_bytes([
+                    data[byte_pos],
+                    data[byte_pos + 1],
+                    data[byte_pos + 2],
+                    data[byte_pos + 3],
+                ]);
+                if block != 0 {
+                    count += 1 + list_dind(block);
+                }
+            }
+            count
+        }
+
+        let mut count = 0;
+        for i in 0..12 {
+            if self.base.direct_block_pointers[i] != 0 {
+                count += 1;
+            }
+        }
+        let block = self.base.indirect_block_pointer;
+        if block != 0 {
+            count += 1 + list_ind(block);
+        }
+        let block = self.base.doubly_indirect_block_pointer;
+        if block != 0 {
+            count += 1 + list_ind(block);
+        }
+        let block = self.base.triply_indirect_block_pointer;
+        if block != 0 {
+            count += 1 + list_tind(block);
+        }
+        count
+    }
+
     pub fn flush(&self) {
         use crate::drivers::ata;
         let self_data = self.to_bytes();
@@ -535,7 +603,7 @@ impl Inode {
             let sb = super::SUPERBLOCK.lock();
             sb.get_block_size()
         };
-        let mut disk_data = super::read_1mb_block(self.block as u32, block_size as u32);
+        let mut disk_data = super::read_1kb_block(self.block as u32, block_size as u32);
         let mut write_flag = false;
         for i in 0..self_data.len() {
             if self_data[i] != disk_data[self.offset_in_block + i] {
@@ -606,7 +674,7 @@ impl Inode {
     }
 
     pub fn get_indirect_block(&self) -> u32 {
-        return self.base.slightly_indirect_block_pointer;
+        return self.base.indirect_block_pointer;
     }
 
     pub fn get_doubly_indirect_block(&self) -> u32 {
@@ -636,8 +704,10 @@ impl Inode {
 
 impl Drop for Inode {
     fn drop(&mut self) {
-        // return;
         if self.need_flush {
+            // update blocks
+            let blocks = self.count_blocks() * SUPERBLOCK.lock().get_block_size() as u32 / 512;
+            self.set_block_count(blocks);
             self.flush();
             SUPERBLOCK.lock().flush();
             BLOCK_GROUP_DESCRIPTOR_TABLE.lock().flush();

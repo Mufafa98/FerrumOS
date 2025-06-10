@@ -96,7 +96,6 @@ impl BlockGroupDescriptorTable {
         bytes
     }
     pub fn flush(&self) {
-        use crate::drivers::ata;
         use crate::serial_println;
         //TODO Remove?
         unsafe {

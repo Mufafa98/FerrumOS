@@ -4,5 +4,4 @@ pub mod apic;
 pub mod ata;
 pub mod fonts;
 pub mod framebuffer;
-pub mod pci;
 pub mod vga;

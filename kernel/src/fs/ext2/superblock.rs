@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{allocator::bump, serial_println};
+use crate::serial_println;
 
 use super::superblock_data_types as sbdt;
 
@@ -83,7 +83,7 @@ impl Superblock {
     pub fn new() -> Self {
         use crate::drivers::ata;
         let mut buf = [0u8; 512];
-        let mut read_result = ata::read(0, 2, &mut buf);
+        let read_result = ata::read(0, 2, &mut buf);
         if read_result.is_err() {
             panic!("Failed to read from disk");
         }

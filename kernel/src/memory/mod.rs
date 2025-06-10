@@ -72,7 +72,7 @@ impl BootInfoFrameAllocator {
 
         // map each region to its address range
         let addr_ranges = usable_regions.map(|r| r.base..(r.base + r.length));
-        // serial_println!(
+        // crate::serial_println!(
         //     "addr_ranges: {:?}",
         //     addr_ranges.map(|x| x.start + " " + x.end)
         // );

@@ -91,21 +91,21 @@ lazy_static! {
         // Set the stack for double faults
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] =
             {    // Set the stack size to 5 pages (5 * 4096 bytes)
-    const STACK_SIZE: usize = 4096 * 5;
-    // Create a static stack with the specified size
-    static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-    #[allow(static_mut_refs)]
-    // Get the start and end addresses of the stack
-    //
-    // The stack is marked as unsafe because it is a static mutable reference
-    // and the address of the stack is taken
-    let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
-    let stack_end = stack_start
-        + STACK_SIZE
-            .try_into()
-            .expect("[Allocator]: Failed to fit usize into u64 in TSS initialization(GDT)");
-    stack_end
-};
+            const STACK_SIZE: usize = 4096 * 5;
+            // Create a static stack with the specified size
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            #[allow(static_mut_refs)]
+            // Get the start and end addresses of the stack
+            //
+            // The stack is marked as unsafe because it is a static mutable reference
+            // and the address of the stack is taken
+            let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+            let stack_end = stack_start
+                + STACK_SIZE
+                    .try_into()
+                    .expect("[Allocator]: Failed to fit usize into u64 in TSS initialization(GDT)");
+            stack_end
+        };
         tss
     };
 }
