@@ -1,5 +1,6 @@
 //! Keyboard task module
 use crate::{print, println};
+use alloc::string::String;
 use conquer_once::spin::OnceCell;
 use core::{
     pin::Pin,
@@ -10,7 +11,10 @@ use futures_util::{
     stream::{Stream, StreamExt},
     task::AtomicWaker,
 };
+use lazy_static::lazy_static;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
+
 /// The scancode queue for keyboard input
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
 /// Add a scancode to the scancode queue
@@ -74,6 +78,12 @@ impl Stream for ScancodeStream {
 }
 /// The waker for the keyboard task
 static WAKER: AtomicWaker = AtomicWaker::new();
+
+lazy_static!(
+    /// Last command
+    pub static ref LAST_COMMAND: Mutex<String> = Mutex::new(String::new());
+);
+
 /// Print keypresses
 pub async fn print_keypresses() {
     // Create a new scancode stream
@@ -92,8 +102,26 @@ pub async fn print_keypresses() {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 // If the key was found, print it
                 match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
+                    DecodedKey::Unicode(character) => {
+                        if character == '\n' {
+                            print!("\n");
+                            crate::shell::execute_command(&LAST_COMMAND.lock());
+                            LAST_COMMAND.lock().clear();
+                        } else if character == '\x08' {
+                            // Backspace
+                            let mut last_command = LAST_COMMAND.lock();
+                            if !last_command.is_empty() {
+                                last_command.pop();
+                                print!("\x08 \x08");
+                            }
+                        } else {
+                            LAST_COMMAND.lock().push(character);
+                            print!("{}", character);
+                        }
+                    }
+                    DecodedKey::RawKey(key) => {
+                        // print!("{:?}", key);
+                    }
                 }
             }
         }

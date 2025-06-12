@@ -155,12 +155,12 @@ impl Superblock {
             let mut write_flag = false;
             for i in 0..self_data.len() {
                 if self_data[i] != disk_data[i] {
-                    serial_println!(
-                        "Data mismatch at index {}: {} != {}",
-                        i,
-                        self_data[i],
-                        disk_data[i]
-                    );
+                    // serial_println!(
+                    //     "Data mismatch at index {}: {} != {}",
+                    //     i,
+                    //     self_data[i],
+                    //     disk_data[i]
+                    // );
                     disk_data[i] = self_data[i];
                     write_flag = true;
                 }
@@ -176,9 +176,9 @@ impl Superblock {
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }
-                serial_println!("Superblock flushed to disk");
+                // serial_println!("Superblock flushed to disk");
             } else {
-                serial_println!("No changes to superblock, not flushing to disk");
+                // serial_println!("No changes to superblock, not flushing to disk");
             }
         }
     }
@@ -187,8 +187,16 @@ impl Superblock {
         self.base.free_blocks_count
     }
 
+    pub fn get_free_inodes(&self) -> u32 {
+        self.base.free_inodes_count
+    }
+
     pub fn set_free_blocks(&mut self, new_value: u32) {
         self.base.free_blocks_count = new_value;
+    }
+
+    pub fn set_free_inodes(&mut self, new_value: u32) {
+        self.base.free_inodes_count = new_value;
     }
 
     pub fn get_first_free_data_block(&self) -> u32 {

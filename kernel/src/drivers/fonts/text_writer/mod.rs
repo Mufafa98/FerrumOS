@@ -3,6 +3,8 @@ use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
+use crate::serial_println;
+
 use super::super::framebuffer::FRAMEBUFFER;
 use super::psf_font::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;
@@ -34,6 +36,11 @@ impl TextWriter {
         match character {
             '\n' => {
                 self.write_newline();
+                return;
+            }
+            '\x08' => {
+                // Move the cursor back by one character
+                self.move_back_cursor();
                 return;
             }
             normal_char => {
@@ -97,6 +104,21 @@ impl TextWriter {
             }
         }
     }
+
+    fn clear_screen(&mut self) {
+        for row in 0..FRAMEBUFFER.get_height() {
+            for col in 0..FRAMEBUFFER.get_width() {
+                FRAMEBUFFER.put_pixel(col, row, self.bg_color.to_u32());
+            }
+        }
+        self.x_position = 0;
+    }
+
+    fn move_back_cursor(&mut self) {
+        if self.x_position > 0 {
+            self.x_position -= (self.font.get_width() * self.font_size_multiplier) as u64;
+        }
+    }
 }
 
 impl fmt::Write for TextWriter {
@@ -149,6 +171,12 @@ pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
     //disable interrupts while printing a message
+    if args.as_str() == Some("\x1B[2J\x1B[1;1H") {
+        interrupts::without_interrupts(|| {
+            TEXT_WRITER.lock().clear_screen();
+        });
+        return;
+    }
     interrupts::without_interrupts(|| {
         TEXT_WRITER.lock().write_fmt(args).unwrap();
     });

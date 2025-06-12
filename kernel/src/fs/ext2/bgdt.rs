@@ -24,8 +24,14 @@ impl BlockGroupDescriptor {
     pub fn get_free_block_count(&self) -> usize {
         return self.free_blocks_count as usize;
     }
+    pub fn get_free_inode_count(&self) -> usize {
+        return self.free_inodes_count as usize;
+    }
     pub fn get_b_bitmap_block(&self) -> usize {
         return self.block_usage_bitmap as usize;
+    }
+    pub fn get_i_bitmap_block(&self) -> usize {
+        return self.inode_usage_bitmap as usize;
     }
     unsafe fn to_bytes(&self) -> Vec<u8> {
         let raw_data = core::slice::from_raw_parts(
@@ -40,6 +46,9 @@ impl BlockGroupDescriptor {
     }
     pub fn set_free_block_count(&mut self, new_value: u16) {
         self.free_blocks_count = new_value;
+    }
+    pub fn set_free_inode_count(&mut self, new_value: u16) {
+        self.free_inodes_count = new_value;
     }
 }
 
@@ -115,12 +124,12 @@ impl BlockGroupDescriptorTable {
             let mut write_flag = false;
             for i in 0..self_data.len() {
                 if self_data[i] != disk_data[i] {
-                    serial_println!(
-                        "Data mismatch at index {}: {} != {}",
-                        i,
-                        self_data[i],
-                        disk_data[i]
-                    );
+                    // serial_println!(
+                    //     "Data mismatch at index {}: {} != {}",
+                    //     i,
+                    //     self_data[i],
+                    //     disk_data[i]
+                    // );
                     disk_data[i] = self_data[i];
                     write_flag = true;
                 }
@@ -136,9 +145,9 @@ impl BlockGroupDescriptorTable {
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }
-                serial_println!("Block Group Descriptor Table flushed to disk");
+                // serial_println!("Block Group Descriptor Table flushed to disk");
             } else {
-                serial_println!("No changes to Block Group Descriptor Table, not flushing to disk");
+                // serial_println!("No changes to Block Group Descriptor Table, not flushing to disk");
             }
         }
     }

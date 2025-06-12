@@ -11,6 +11,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod io;
 pub mod memory;
+pub mod shell;
 pub mod task;
 pub mod timer;
 pub mod utils;
