@@ -91,6 +91,14 @@ impl BlockGroupDescriptorTable {
     pub fn get_block_group_descriptor_as_mut(&mut self, index: usize) -> &mut BlockGroupDescriptor {
         &mut self.block_group_descriptors[index]
     }
+    pub fn inc_dir_count_block_address(&mut self, block_address: usize, block_size: usize) {
+        let bgd_index = block_address / block_size;
+        if bgd_index >= self.block_group_descriptors.len() {
+            panic!("Block address out of bounds for Block Group Descriptor Table");
+        }
+        let bgd = &mut self.block_group_descriptors[bgd_index];
+        bgd.directories_count += 1;
+    }
     unsafe fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         for bgd in &self.block_group_descriptors {

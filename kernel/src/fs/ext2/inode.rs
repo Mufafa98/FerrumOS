@@ -5,7 +5,7 @@ use crate::fs::ext2::{read_1kb_block, write_1kb_block, BLOCK_GROUP_DESCRIPTOR_TA
 
 use crate::serial_println;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum InodeType {
     FIFO,
     CharacterDevice,
@@ -127,8 +127,37 @@ fn mark_block_as_used(block_number: usize) {
     let after = to_modify | (1 << block_bit);
     data[block_byte] = after;
     write_1kb_block(b_map_block as u32, block_size as u32, &data, data.len());
+    let bgdt_block_update = bgd.get_free_block_count() - 1;
+    let sb_block_update = SUPERBLOCK.lock().get_free_blocks() - 1;
+    bgd.set_free_block_count(bgdt_block_update as u16);
+    SUPERBLOCK.lock().set_free_blocks(sb_block_update);
+}
+
+fn mark_block_as_free(block_number: usize) {
+    let (block_size, blocks_per_group) = {
+        let sb = SUPERBLOCK.lock();
+        (sb.get_block_size(), sb.get_blocks_per_group())
+    };
+    let block_number = block_number - 1;
+    let block_group_id = block_number / blocks_per_group;
+    let block_byte = block_number % blocks_per_group / 8;
+    let block_bit = block_number % blocks_per_group % 8;
+
+    let mut bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
+    let bgd = bgdt.get_block_group_descriptor_as_mut(block_group_id);
+
+    let b_map_block = bgd.get_b_bitmap_block();
+    let mut data = read_1kb_block(b_map_block as u32, block_size as u32);
+
+    let to_modify = data[block_byte];
+    let after = to_modify & !(1 << block_bit);
+    data[block_byte] = after;
+
+    write_1kb_block(b_map_block as u32, block_size as u32, &data, data.len());
+
     let bgdt_block_update = bgd.get_free_block_count() + 1;
     let sb_block_update = SUPERBLOCK.lock().get_free_blocks() + 1;
+
     bgd.set_free_block_count(bgdt_block_update as u16);
     SUPERBLOCK.lock().set_free_blocks(sb_block_update);
 }
@@ -183,6 +212,39 @@ fn mark_inode_as_used(inode_number: usize) {
     data[inode_byte] = after;
     write_1kb_block(i_map_block as u32, block_size as u32, &data, data.len());
 
+    let bgdt_inode_update = bgd.get_free_inode_count() - 1;
+    let sb_inode_update = SUPERBLOCK.lock().get_free_inodes() - 1;
+    bgd.set_free_inode_count(bgdt_inode_update as u16);
+    SUPERBLOCK.lock().set_free_inodes(sb_inode_update);
+}
+
+fn mark_inode_as_free(inode_number: usize) {
+    let (block_size, inodes_per_group) = {
+        let sb = SUPERBLOCK.lock();
+        (sb.get_block_size(), sb.get_inodes_per_group())
+    };
+    let inode_number = inode_number - 1;
+    let block_group_id = inode_number / inodes_per_group;
+    let inode_byte = inode_number % inodes_per_group / 8;
+    let inode_bit = inode_number % inodes_per_group % 8;
+
+    let mut bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
+    let bgd = bgdt.get_block_group_descriptor_as_mut(block_group_id);
+
+    let i_map_block = bgd.get_i_bitmap_block();
+    let mut data = read_1kb_block(i_map_block as u32, block_size as u32);
+
+    let to_modify = data[inode_byte];
+    let after = to_modify & !(1 << inode_bit);
+    serial_println!(
+        "Unmarking inode {} as free. Before: {:08b} After: {:08b}",
+        inode_number,
+        to_modify,
+        after
+    );
+    data[inode_byte] = after;
+    write_1kb_block(i_map_block as u32, block_size as u32, &data, data.len());
+
     let bgdt_inode_update = bgd.get_free_inode_count() + 1;
     let sb_inode_update = SUPERBLOCK.lock().get_free_inodes() + 1;
     bgd.set_free_inode_count(bgdt_inode_update as u16);
@@ -233,6 +295,32 @@ impl Inode {
             offset_in_block: 0,
             need_flush: false,
         }
+    }
+
+    fn clear(&mut self) {
+        self.base = InodeBaseFields {
+            mode: 0,
+            uid: 0,
+            size_low: 0,
+            last_access_time: 0,
+            cretion_time: 0,
+            last_modification_time: 0,
+            deletion_time: 0,
+            group_id: 0,
+            hard_links_count: 0,
+            disk_sectors_count: 0,
+            flags: 0,
+            os_specific: 0,
+            direct_block_pointers: [0; 12],
+            indirect_block_pointer: 0,
+            doubly_indirect_block_pointer: 0,
+            triply_indirect_block_pointer: 0,
+            generation_number: 0,
+            file_acl: 0,
+            dir_acl: 0,
+            block_address_fragment: 0,
+            os_specific_2: 0,
+        };
     }
 
     pub fn from_id(inode_id: usize) -> Self {
@@ -796,6 +884,101 @@ impl Inode {
     pub fn get_block_count(&self) -> u32 {
         return self.base.disk_sectors_count;
     }
+
+    pub fn inc_hard_links_count(&mut self) {
+        self.base.hard_links_count += 1;
+    }
+
+    pub fn dec_hard_links_count(&mut self) {
+        if self.base.hard_links_count == 0 {
+            return;
+        }
+        serial_println!(
+            "Decrementing hard links count for inode {}: {}",
+            self.id,
+            self.base.hard_links_count
+        );
+        self.base.hard_links_count -= 1;
+        if self.base.hard_links_count == 0 {
+            fn dealloc_d(block: u32) {
+                if block == 0 {
+                    return;
+                }
+                let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+                write_1kb_block(block, block_size, &[0; 1024], 1024);
+                mark_block_as_free(block as usize);
+            }
+
+            fn dealloc_i(block: u32) {
+                if block == 0 {
+                    return;
+                }
+                let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+                let mut data = read_1kb_block(block, block_size);
+
+                for i in 0..256 {
+                    let block_number = u32::from_le_bytes([
+                        data[i * 4],
+                        data[i * 4 + 1],
+                        data[i * 4 + 2],
+                        data[i * 4 + 3],
+                    ]);
+                    dealloc_d(block_number);
+                }
+                write_1kb_block(block, block_size, &[0; 1024], 1024);
+                mark_block_as_free(block as usize);
+            }
+
+            fn dealloc_di(block: u32) {
+                if block == 0 {
+                    return;
+                }
+                let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+                let mut data = read_1kb_block(block, block_size);
+
+                for i in 0..256 {
+                    let block_number = u32::from_le_bytes([
+                        data[i * 4],
+                        data[i * 4 + 1],
+                        data[i * 4 + 2],
+                        data[i * 4 + 3],
+                    ]);
+                    dealloc_i(block_number);
+                }
+                write_1kb_block(block, block_size, &[0; 1024], 1024);
+                mark_block_as_free(block as usize);
+            }
+
+            fn dealloc_ti(block: u32) {
+                if block == 0 {
+                    return;
+                }
+                let block_size = SUPERBLOCK.lock().get_block_size() as u32;
+                let mut data = read_1kb_block(block, block_size);
+
+                for i in 0..256 {
+                    let block_number = u32::from_le_bytes([
+                        data[i * 4],
+                        data[i * 4 + 1],
+                        data[i * 4 + 2],
+                        data[i * 4 + 3],
+                    ]);
+                    dealloc_di(block_number);
+                }
+                write_1kb_block(block, block_size, &[0; 1024], 1024);
+                mark_block_as_free(block as usize);
+            }
+
+            dealloc_ti(self.get_triply_indirect_block());
+            dealloc_di(self.get_doubly_indirect_block());
+            dealloc_i(self.get_indirect_block());
+            for block in self.get_direct_blocks() {
+                dealloc_d(block.clone());
+            }
+            mark_inode_as_free(self.id);
+            self.clear();
+        }
+    }
 }
 
 impl Drop for Inode {
@@ -874,8 +1057,12 @@ pub fn build_inode(inode_type: InodeType) -> Inode {
         id: free_inode,
         block: inode_table_offset,
         offset_in_block,
-        need_flush: false,
+        need_flush: true,
     };
+    inode.allocate_new_block();
+    if inode_type == InodeType::Directory {
+        inode.set_size(1024);
+    }
     mark_inode_as_used(free_inode as usize);
     inode
 }

@@ -139,16 +139,6 @@ impl DirEntryType {
 }
 
 #[derive(Debug, Clone)]
-enum DirEntryError {
-    InvalidName,
-    UnsuportedEntryType,
-    EntryAlreadyExists,
-    EntryDoesNotExist,
-    EntryHasNoParent,
-    ParentNotDirectory,
-}
-
-#[derive(Debug, Clone)]
 #[repr(C)]
 struct DirEntry {
     inode: u32,
@@ -181,18 +171,247 @@ impl DirEntry {
         }
     }
 
-    fn empty_copy(&self) -> Self {
-        let mut new_entry = self.clone();
-        new_entry.inode = 0;
-        new_entry.rec_len = 0;
-        new_entry.name_len = 0;
-        new_entry.file_type = DirEntryType::Unknown.to_u8();
-        new_entry.name.clear();
-        new_entry.next = 0;
-        new_entry
+    fn new_dir(path: &str) -> Self {
+        let trimmed_path = path.trim();
+
+        // 0. Determine parent path and new directory name
+        let (parent_path_str, dir_name_str) = {
+            if let Some(idx) = trimmed_path.rfind('/') {
+                let p_path = &trimmed_path[..idx];
+                let f_name = &trimmed_path[idx + 1..];
+                if p_path.is_empty() {
+                    // Path was like "/newdir", parent is "/"
+                    (String::from("/"), f_name.to_string())
+                } else {
+                    // Path was like "a/b/newdir" or "/a/b/newdir"
+                    (p_path.to_string(), f_name.to_string())
+                }
+            } else {
+                // Path was like "newdir", parent is "."
+                (String::from("."), trimmed_path.to_string())
+            }
+        };
+
+        if dir_name_str.is_empty() || dir_name_str == "." || dir_name_str == ".." {
+            serial_println!("Invalid directory name: '{}'", dir_name_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
+        }
+
+        // Check if path already exists
+        if let Some(existing_entry) = find_by_path(trimmed_path) {
+            serial_println!("Path {} already exists.", trimmed_path);
+            // Optionally, return the existing entry if it's a directory, or an error entry
+            if DirEntryType::from_u8(existing_entry.file_type) == DirEntryType::Directory {
+                return existing_entry;
+            } else {
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
+        }
+
+        // 1. Get the parent directory's inode.
+        let parent_dir_entry = match find_by_path(&parent_path_str) {
+            Some(pde) => pde,
+            None => {
+                serial_println!("Parent directory '{}' not found.", parent_path_str);
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
+        };
+
+        let mut parent_inode = Inode::from_id(parent_dir_entry.inode as usize);
+
+        if parent_inode.get_type() != InodeType::Directory {
+            serial_println!("Parent path '{}' is not a directory.", parent_path_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
+        }
+
+        // 2. Create the inode for the new directory.
+        let mut new_dir_inode = build_inode(InodeType::Directory);
+        new_dir_inode.set_hard_links_count(2);
+
+        // 3. Create "." entry for the new directory.
+        let mut dot_entry = DirEntry {
+            inode: new_dir_inode.get_id() as u32,
+            rec_len: 0, // add_to_inode will calculate this
+            name_len: 1,
+            file_type: DirEntryType::Directory.to_u8(),
+            name: ".".to_string(),
+            next: 0,
+        };
+
+        // 4. Create ".." entry for the new directory.
+        let mut dot_dot_entry = DirEntry {
+            inode: parent_inode.get_id() as u32,
+            rec_len: 0, // add_to_inode will calculate this
+            name_len: 2,
+            file_type: DirEntryType::Directory.to_u8(),
+            name: "..".to_string(),
+            next: 0,
+        };
+
+        // 5. Add "." and ".." entries to the new directory's data block.
+        dot_entry.add_to_inode(&mut new_dir_inode);
+        serial_println!(
+            "Added '.' entry to new directory inode: {}",
+            new_dir_inode.get_id()
+        );
+        dot_dot_entry.add_to_inode(&mut new_dir_inode);
+        serial_println!(
+            "Added '..' entry to new directory inode: {}",
+            new_dir_inode.get_id()
+        );
+        // 6. Increment parent_inode's link count because ".." in new_dir points to it.
+        parent_inode.inc_hard_links_count();
+
+        // 7. Create the DirEntry for the new directory (to be added to the parent directory).
+        let mut entry_for_parent = DirEntry {
+            inode: new_dir_inode.get_id() as u32,
+            rec_len: 0, // add_to_inode will calculate this
+            name_len: dir_name_str.len() as u8,
+            file_type: DirEntryType::Directory.to_u8(),
+            name: dir_name_str,
+            next: 0,
+        };
+
+        // 8. Add the new directory's entry to the parent directory.
+        entry_for_parent.add_to_inode(&mut parent_inode);
+
+        serial_println!(
+            "Directory created: {} (inode {}) in parent {} (inode {})",
+            entry_for_parent.name,
+            new_dir_inode.get_id(),
+            parent_path_str,
+            parent_inode.get_id()
+        );
+
+        entry_for_parent // Return the DirEntry that was added to the parent.
     }
 
-    fn create_fs_entry(path: &str, new_inode_type: InodeType) -> Result<DirEntry, DirEntryError> {
+    fn new_file(name: &str) -> Self {
+        let trimmed_path = name.trim();
+
+        // 0. Determine parent path and new file name
+        let (parent_path_str, file_name_str) = {
+            if let Some(idx) = trimmed_path.rfind('/') {
+                let p_path = &trimmed_path[..idx];
+                let f_name = &trimmed_path[idx + 1..];
+                if p_path.is_empty() {
+                    // Path was like "/file", parent is "/"
+                    (String::from("/"), f_name.to_string())
+                } else {
+                    // Path was like "a/b/file" or "/a/b/file"
+                    (p_path.to_string(), f_name.to_string())
+                }
+            } else {
+                // Path was like "file", parent is "."
+                (String::from("."), trimmed_path.to_string())
+            }
+        };
+
+        // Validate file_name_str
+        if file_name_str.is_empty() || file_name_str == "." || file_name_str == ".." {
+            serial_println!("Invalid file name: '{}'", file_name_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
+        }
+
+        // Check if path already exists (using the full trimmed_path)
+        if let Some(existing_entry) = find_by_path(trimmed_path) {
+            serial_println!("File {} already exists.", trimmed_path); // Consider consistency with println! vs serial_println!
+            return existing_entry; // Return the existing entry
+        }
+
+        // 1. Get the parent directory's inode.
+        let parent_dir_entry = match find_by_path(&parent_path_str) {
+            Some(pde) => pde,
+            None => {
+                serial_println!("Parent directory '{}' not found.", parent_path_str);
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
+        };
+
+        let mut parent_inode = Inode::from_id(parent_dir_entry.inode as usize);
+
+        if parent_inode.get_type() != InodeType::Directory {
+            serial_println!("Parent path '{}' is not a directory.", parent_path_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
+        }
+
+        // 2. Create the inode for the new file.
+        let new_file_inode = build_inode(InodeType::RegularFile);
+
+        // 3. Create the DirEntry for the new file.
+        let mut entry_for_parent = DirEntry {
+            inode: new_file_inode.get_id() as u32,
+            rec_len: 0, // add_to_inode will calculate the actual on-disk rec_len
+            name_len: file_name_str.len() as u8,
+            file_type: DirEntryType::RegularFile.to_u8(),
+            name: file_name_str.clone(),
+            next: 0,
+        };
+
+        // 4. Add the new file's entry to the parent directory.
+        entry_for_parent.add_to_inode(&mut parent_inode);
+
+        serial_println!(
+            "File created: {} (inode {}) in parent {} (inode {})",
+            entry_for_parent.name,
+            new_file_inode.get_id(),
+            parent_path_str,
+            parent_inode.get_id()
+        );
+
+        entry_for_parent
+    }
+
+    fn create_fs_entry(path: &str, new_inode_type: InodeType) -> Self {
         let trimmed_path = path.trim();
 
         // 0. Determine parent path and new entry name
@@ -204,7 +423,7 @@ impl DirEntry {
                     // Path was like "/entry", parent is "/"
                     (String::from("/"), f_name.to_string())
                 } else {
-                    // Path was like "a/b/entry"
+                    // Path was like "a/b/entry" or "/a/b/entry"
                     (p_path.to_string(), f_name.to_string())
                 }
             } else {
@@ -215,54 +434,116 @@ impl DirEntry {
 
         // Validate entry_name_str
         if entry_name_str.is_empty() || entry_name_str == "." || entry_name_str == ".." {
-            return Err(DirEntryError::InvalidName);
+            serial_println!("Invalid entry name: '{}'", entry_name_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
         }
 
         let target_dir_entry_type = match new_inode_type {
             InodeType::Directory => DirEntryType::Directory,
             InodeType::RegularFile => DirEntryType::RegularFile,
-            _ => return Err(DirEntryError::UnsuportedEntryType),
+            // Extend this match if other InodeTypes can be created this way
+            _ => {
+                serial_println!(
+                    "Unsupported InodeType for create_fs_entry: {:?}",
+                    new_inode_type
+                );
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
         };
 
         // Check if path already exists
         if let Some(existing_entry) = find_by_path(trimmed_path) {
-            return Err(DirEntryError::EntryAlreadyExists);
+            serial_println!("Path {} already exists.", trimmed_path);
+            if DirEntryType::from_u8(existing_entry.file_type) == target_dir_entry_type {
+                return existing_entry; // Path exists and is of the correct type
+            } else {
+                // Path exists but is of a different type
+                serial_println!(
+                    "Path {} exists but is of a different type (expected {:?}, found {:?}).",
+                    trimmed_path,
+                    target_dir_entry_type,
+                    DirEntryType::from_u8(existing_entry.file_type)
+                );
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
         }
 
         // 1. Get the parent directory's inode.
         let parent_dir_entry_opt = find_by_path(&parent_path_str);
         let parent_dir_entry = match parent_dir_entry_opt {
             Some(pde) => pde,
-            None => return Err(DirEntryError::EntryHasNoParent),
+            None => {
+                serial_println!("Parent directory '{}' not found.", parent_path_str);
+                return DirEntry {
+                    inode: 0,
+                    rec_len: 0,
+                    name_len: 0,
+                    file_type: 0,
+                    name: String::new(),
+                    next: 0,
+                };
+            }
         };
 
         let mut parent_inode = Inode::from_id(parent_dir_entry.inode as usize);
 
         if parent_inode.get_type() != InodeType::Directory {
-            return Err(DirEntryError::ParentNotDirectory);
+            serial_println!("Parent path '{}' is not a directory.", parent_path_str);
+            return DirEntry {
+                inode: 0,
+                rec_len: 0,
+                name_len: 0,
+                file_type: 0,
+                name: String::new(),
+                next: 0,
+            };
         }
 
         // 2. Create the inode for the new entry.
+        // build_inode should set need_flush=true and appropriate initial link counts
+        // (1 for files, 1 or 2 for dirs depending on its internal logic before set_hard_links_count)
         let mut new_entry_inode = build_inode(new_inode_type.clone());
 
         // Directory-specific setup
         if new_inode_type == InodeType::Directory {
-            // Ensure new directory inode has 2 links:
-            // one for its name in parent, one for its own "."
-            new_entry_inode.inc_hard_links_count();
+            // Ensure new directory inode has 2 links: one for its name in parent, one for its own "."
+            new_entry_inode.set_hard_links_count(2);
 
+            // Create "." entry for the new directory.
             let mut dot_entry = DirEntry {
                 inode: new_entry_inode.get_id() as u32,
-                rec_len: 0,
+                rec_len: 0, // add_to_inode will calculate this
                 name_len: 1,
                 file_type: DirEntryType::Directory.to_u8(),
                 name: ".".to_string(),
                 next: 0,
             };
 
+            // Create ".." entry for the new directory.
             let mut dot_dot_entry = DirEntry {
-                inode: parent_inode.get_id() as u32,
-                rec_len: 0,
+                inode: parent_inode.get_id() as u32, // Points to parent's inode ID
+                rec_len: 0,                          // add_to_inode will calculate this
                 name_len: 2,
                 file_type: DirEntryType::Directory.to_u8(),
                 name: "..".to_string(),
@@ -271,33 +552,38 @@ impl DirEntry {
 
             // Add "." and ".." entries to the new directory's data block.
             dot_entry.add_to_inode(&mut new_entry_inode);
+            serial_println!(
+                "Added '.' entry to new directory inode: {}",
+                new_entry_inode.get_id()
+            );
             dot_dot_entry.add_to_inode(&mut new_entry_inode);
+            serial_println!(
+                "Added '..' entry to new directory inode: {}",
+                new_entry_inode.get_id()
+            );
 
-            // Increment parent_inode's link count because ".." in the
-            // new directory points to it.
+            // Increment parent_inode's link count because ".." in the new directory points to it.
             parent_inode.inc_hard_links_count();
+            // parent_inode.need_flush = true; // inc_hard_links_count should ideally handle this or it's handled by Drop
         }
+        // For files, build_inode should have set link count to 1.
 
         // 3. Create the DirEntry for the new entry (to be added to the parent directory).
         let mut entry_for_parent = DirEntry {
             inode: new_entry_inode.get_id() as u32,
-            rec_len: 0,
+            rec_len: 0, // add_to_inode will calculate the actual on-disk rec_len
             name_len: entry_name_str.len() as u8,
             file_type: target_dir_entry_type.to_u8(),
-            name: entry_name_str.clone(),
-            next: 0,
+            name: entry_name_str.clone(), // Use the parsed entry_name_str
+            next: 0,                      // This is a runtime field, not for on-disk struct
         };
 
         // 4. Add the new entry's DirEntry to the parent directory.
+        // add_to_inode should handle block allocation, rec_len updates, parent inode size, and marking parent for flush.
         entry_for_parent.add_to_inode(&mut parent_inode);
 
-        // 5. Increment dir count in BGDT if entry is a directory.
-        if new_inode_type == InodeType::Directory {
-            let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-            let mut bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
-            let block_address = parent_inode.get_direct_block(0);
-            bgdt.inc_dir_count_block_address(block_address as usize, block_size as usize);
-        }
+        // new_entry_inode and parent_inode should be flushed to disk via their Drop impl
+        // if need_flush was set by build_inode, from_id, or subsequent modifications.
 
         let type_str = if new_inode_type == InodeType::Directory {
             "Directory"
@@ -313,73 +599,7 @@ impl DirEntry {
             parent_inode.get_id()
         );
 
-        Ok(entry_for_parent)
-    }
-
-    fn remove_fs_entry(path: &str, new_inode_type: InodeType) -> Result<(), DirEntryError> {
-        //todo implement rmdir
-        if new_inode_type != InodeType::RegularFile {
-            return Err(DirEntryError::UnsuportedEntryType);
-        }
-
-        let trimmed_path = path.trim();
-
-        // 0. Determine parent path and new entry name
-        let (parent_path_str, entry_name_str) = {
-            if let Some(idx) = trimmed_path.rfind('/') {
-                let p_path = &trimmed_path[..idx];
-                let f_name = &trimmed_path[idx + 1..];
-                if p_path.is_empty() {
-                    // Path was like "/entry", parent is "/"
-                    (String::from("/"), f_name.to_string())
-                } else {
-                    // Path was like "a/b/entry"
-                    (p_path.to_string(), f_name.to_string())
-                }
-            } else {
-                // Path was like "entry", parent is "."
-                (String::from("."), trimmed_path.to_string())
-            }
-        };
-
-        // Validate entry_name_str
-        if entry_name_str.is_empty() || entry_name_str == "." || entry_name_str == ".." {
-            return Err(DirEntryError::InvalidName);
-        }
-
-        // Check if path exists
-        if find_by_path(trimmed_path).is_none() {
-            return Err(DirEntryError::EntryDoesNotExist);
-        }
-
-        // 1. Get entryes for the parent directory and the entry to be removed.
-        let entry_to_remove_opt = find_by_path(trimmed_path);
-        let entry_to_remove = match entry_to_remove_opt {
-            Some(entry) => entry,
-            None => return Err(DirEntryError::EntryDoesNotExist),
-        };
-        let parent_dir_entry_opt = find_by_path(&parent_path_str);
-        let parent_dir_entry = match parent_dir_entry_opt {
-            Some(pde) => pde,
-            None => return Err(DirEntryError::EntryHasNoParent),
-        };
-        let mut parent_inode = Inode::from_id(parent_dir_entry.inode as usize);
-        if parent_inode.get_type() != InodeType::Directory {
-            return Err(DirEntryError::ParentNotDirectory);
-        }
-
-        // 2. Remove the entry from the parent directory.
-        let mut entry_to_remove = entry_to_remove.clone();
-        entry_to_remove.remove_from_inode(&mut parent_inode);
-        serial_println!(
-            "Removing entry {} (inode {}) from parent {} (inode {})",
-            entry_to_remove.name,
-            entry_to_remove.inode,
-            parent_path_str,
-            parent_inode.get_id()
-        );
-
-        Ok(())
+        entry_for_parent
     }
 
     fn size(&self) -> usize {
@@ -404,178 +624,17 @@ impl DirEntry {
         data
     }
 
-    fn remove_from_inode(&mut self, inode: &mut Inode) {
-        serial_println!("Removing entry {} from inode {}", self.name, inode.get_id());
-        fn dealloc_d(
-            block_addr: u32,
-            entry_to_remove: &DirEntry,
-            block_size: u32,
-        ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
-            let mut current_offset = 0;
-            let mut prev_entry_offset = 0;
-
-            while current_offset < data.len() {
-                let entry = DirEntry::from_ptr(&data, current_offset);
-                if entry.rec_len == 0 {
-                    break;
-                }
-
-                // Check if this is the entry we want to remove
-                let same_inode = entry.inode == entry_to_remove.inode;
-                let same_name = entry.name.trim() == entry_to_remove.name.trim();
-
-                if same_inode && same_name {
-                    // Found the entry.
-                    let removed_entry_rec_len = entry.rec_len;
-                    let empty_entry = entry_to_remove.empty_copy();
-                    if current_offset == prev_entry_offset {
-                        // Case 1: Removing the first entry in the block.
-                        let inode_bytes = empty_entry.get_aligned_bytes();
-                        data[current_offset..current_offset + inode_bytes.len()]
-                            .copy_from_slice(&inode_bytes);
-                    } else {
-                        // Case 2: Removing a subsequent entry.
-                        // Absorb its rec_len into the previous entry.
-                        let mut prev_entry = DirEntry::from_ptr(&data, prev_entry_offset);
-                        let new_rec_len = prev_entry.rec_len + removed_entry_rec_len;
-
-                        // Write the new rec_len to the previous entry in the buffer.
-                        let rec_len_bytes = new_rec_len.to_le_bytes();
-                        data[prev_entry_offset + 4..prev_entry_offset + 6]
-                            .copy_from_slice(&rec_len_bytes);
-                    }
-
-                    // Write the modified block back to disk.
-                    write_1kb_block(block_addr, block_size, &data, data.len());
-                    return Ok(true); // Found and removed
-                }
-
-                if entry.inode != 0 {
-                    // Only update prev_entry_offset if the current entry is valid
-                    prev_entry_offset = current_offset;
-                }
-                current_offset += entry.rec_len as usize;
-            }
-
-            Ok(false) // Not found in this block
-        }
-
-        fn dealloc_i(
-            block_addr: u32,
-            entry_to_remove: &DirEntry,
-            block_size: u32,
-        ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
-
-            for i in 0..256 {
-                let block_number = u32::from_le_bytes([
-                    data[i * 4],
-                    data[i * 4 + 1],
-                    data[i * 4 + 2],
-                    data[i * 4 + 3],
-                ]);
-                let found = dealloc_d(block_number, entry_to_remove, block_size).unwrap_or(false);
-                if found {
-                    // If we found and removed the entry, we can stop
-                    return Ok(true);
-                }
-            }
-            Ok(false) // Not found in this indirect block
-        }
-
-        fn dealloc_di(
-            block_addr: u32,
-            entry_to_remove: &DirEntry,
-            block_size: u32,
-        ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
-
-            for i in 0..256 {
-                let block_number = u32::from_le_bytes([
-                    data[i * 4],
-                    data[i * 4 + 1],
-                    data[i * 4 + 2],
-                    data[i * 4 + 3],
-                ]);
-                let found = dealloc_i(block_number, entry_to_remove, block_size).unwrap_or(false);
-                if found {
-                    // If we found and removed the entry, we can stop
-                    return Ok(true);
-                }
-            }
-            Ok(false) // Not found in this doubly indirect block
-        }
-
-        fn dealloc_ti(
-            block_addr: u32,
-            entry_to_remove: &DirEntry,
-            block_size: u32,
-        ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
-
-            for i in 0..256 {
-                let block_number = u32::from_le_bytes([
-                    data[i * 4],
-                    data[i * 4 + 1],
-                    data[i * 4 + 2],
-                    data[i * 4 + 3],
-                ]);
-                let found = dealloc_di(block_number, entry_to_remove, block_size).unwrap_or(false);
-                if found {
-                    // If we found and removed the entry, we can stop
-                    return Ok(true);
-                }
-            }
-            Ok(false) // Not found in this triply indirect block
-        }
-
-        let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-
-        let mut removed = false;
-
-        for direct_block in inode.get_direct_blocks() {
-            if *direct_block == 0 {
-                continue;
-            }
-            if dealloc_d(*direct_block, self, block_size).unwrap_or(false) {
-                removed = true;
-            }
-        }
-        if inode.get_indirect_block() != 0 || !removed {
-            if dealloc_i(inode.get_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
-            }
-        }
-        if inode.get_doubly_indirect_block() != 0 || !removed {
-            if dealloc_di(inode.get_doubly_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
-            }
-        }
-        if inode.get_triply_indirect_block() != 0 || !removed {
-            if dealloc_ti(inode.get_triply_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
-            }
-        }
-
-        let mut self_inode = Inode::from_id(self.inode as usize);
-        self_inode.dec_hard_links_count();
-    }
-
     fn add_to_inode(&mut self, inode: &mut Inode) {
-        serial_println!("Adding entry {} to inode {}", self.name, inode.get_id());
         fn entry_on_d(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
             // Get the block size from the superblock
             // and read the block data
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
             let mut data = read_1kb_block(block, block_size);
             // Find the last entry in the directory
-            serial_println!("Searching for last entry in block {}", block);
             let mut entry = DirEntry::from_ptr(&data, 0);
             while entry.rec_len != 0 && entry.next < data.len() {
                 entry = DirEntry::from_ptr(&data, entry.next);
             }
-            serial_println!("Last entry found: {:?}", entry);
             let mut current_offset = 0;
             let mut next = 0;
             let mut remaining_space = data.len();
@@ -585,45 +644,32 @@ impl DirEntry {
                 remaining_space = data.len() - next;
             }
 
-            serial_println!(
-                "Current offset: {}, next: {}, remaining space: {}",
-                current_offset,
-                next,
-                remaining_space
-            );
-
-            if remaining_space < new_entry.size() || block == 0 {
+            if remaining_space < new_entry.size() || block == 0 || current_offset == 0 {
                 let new_block = inode.allocate_new_block();
                 if new_block == None {
                     serial_println!("Failed to allocate new block for entry {}", new_entry.name);
                     return;
                 }
                 let new_block = new_block.unwrap();
-                serial_println!(
-                    "No space left in block {}, allocating new block {}",
-                    block,
-                    new_block
-                );
                 data.fill(0);
                 new_entry.rec_len = data.len() as u16;
                 let new_entry_bytes = new_entry.get_aligned_bytes();
-                serial_println!("Adding new entry: {:?}", new_entry);
                 data[0..new_entry_bytes.len()].copy_from_slice(&new_entry_bytes);
                 write_1kb_block(new_block, block_size, &data, data.len());
             } else {
-                serial_println!("Adding entry to existing block {}", block);
-                if entry.inode != 0 {
-                    serial_println!("Updating last entry in block {}", block);
-                    data[current_offset..].fill(0);
-                    entry.rec_len = entry.size() as u16;
-                    let old_entry_bytes = entry.get_aligned_bytes();
-                    serial_println!("Updated last entry: {:?}", entry);
-                    data[current_offset..next].copy_from_slice(&old_entry_bytes);
-                }
+                serial_println!(
+                    "Adding entry {} to block {} at offset {}",
+                    new_entry.name,
+                    block,
+                    current_offset
+                );
+                data[current_offset..].fill(0);
+                entry.rec_len = entry.size() as u16;
+                let old_entry_bytes = entry.get_aligned_bytes();
+                data[current_offset..next].copy_from_slice(&old_entry_bytes);
 
                 new_entry.rec_len = (data.len() - next) as u16;
                 let new_entry_bytes = new_entry.get_aligned_bytes();
-                serial_println!("Adding new entry: {:?}", new_entry);
                 data[next..next + new_entry_bytes.len()].copy_from_slice(&new_entry_bytes);
 
                 write_1kb_block(block, block_size, &data, data.len());
@@ -718,19 +764,14 @@ impl DirEntry {
         }
 
         if inode.get_triply_indirect_block() != 0 {
-            serial_println!("Adding to triply indirect block");
             entry_on_t(inode.get_triply_indirect_block(), inode, self);
         } else if inode.get_doubly_indirect_block() != 0 {
-            serial_println!("Adding to doubly indirect block");
-            entry_on_db(inode.get_doubly_indirect_block(), inode, self);
+            entry_on_d(inode.get_doubly_indirect_block(), inode, self);
         } else if inode.get_indirect_block() != 0 {
-            serial_println!("Adding to indirect block");
             entry_on_i(inode.get_indirect_block(), inode, self);
         } else {
-            serial_println!("Adding to direct block");
             let direct_blocks = inode.get_direct_blocks();
             if direct_blocks.is_empty() {
-                serial_println!("No direct blocks found, allocating new block");
                 let new_block = inode
                     .allocate_new_block()
                     .expect("Failed to allocate new block");
@@ -1050,7 +1091,7 @@ pub fn ls(path: Option<&str>) {
 pub fn touch(path: &str) {
     // let entry = DirEntry::new_file(path);
     let entry = DirEntry::create_fs_entry(path, InodeType::RegularFile);
-    if entry.is_err() {
+    if entry.inode == 0 {
         serial_println!("Failed to create file: {}", path);
         return;
     }
@@ -1058,24 +1099,25 @@ pub fn touch(path: &str) {
 }
 
 pub fn mkdir(path: &str) {
+    // todo!("Implement mkdir function");
+    // let entry = DirEntry::new_dir(path);
     let entry = DirEntry::create_fs_entry(path, InodeType::Directory);
-    if entry.is_err() {
+    if entry.inode == 0 {
         serial_println!("Failed to create directory: {}", path);
         return;
     }
     serial_println!("Directory created: {:?}", entry);
 }
 
-pub fn rmfile(path: &str) {
-    let result = DirEntry::remove_fs_entry(path, InodeType::RegularFile);
-    if result.is_err() {
-        serial_println!("Failed to remove file: {}", path);
-        return;
-    }
-    serial_println!("File removed: {}", path);
-}
-
 pub fn init() {
+    use inode::InodeType;
+    // ls(None);
+    // DirEntry::new_file("test.txt");
+    // DirEntry::new_file("lorem_ipsum.txt");
+    // DirEntry::new_file("test_dir/test.txt");
+    // DirEntry::new_file("test_dir/test_dir2/test2.txt");
+    // ls(None);
+    // ls(Some("lost+found"));
 
     // let test_file = File::from_path("1234");
     // let lorem_ipsum = File::from_path("let");

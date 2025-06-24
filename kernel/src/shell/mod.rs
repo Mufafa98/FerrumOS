@@ -1,15 +1,20 @@
 use crate::{print, println};
 
+pub mod ctw;
+
+static HELP_MESSAGE: &str = "Below are presented available functions!\n\
+help - Show this help message\n\
+clear - Clear the screen\n\
+echo <message> - Echo the message back\n\
+ls <directory> - List files in the directory\n\
+touch <filename> - Create a new file with the given name\n\
+mkdir <dirname> - Create a new directory with the given name\n\
+rm <filename> - Remove a file with the given name\n";
+
 pub fn execute_command(command: &str) {
     match command.trim() {
         "help" => {
-            println!("Available commands:");
-            println!("  help - Show this help message");
-            println!("  clear - Clear the screen");
-            println!("  echo <message> - Echo the message back");
-            println!("  ls <directory> - List files in the directory");
-            println!("  touch <filename> - Create a new file with the given name");
-            println!("  mkdir <dirname> - Create a new directory with the given name");
+            println!("{}", HELP_MESSAGE);
         }
         "clear" => {
             print!("\x1B[2J\x1B[1;1H"); // ANSI escape code to clear the screen
@@ -40,6 +45,14 @@ pub fn execute_command(command: &str) {
                 return;
             }
             crate::fs::ext2::mkdir(dirname);
+        }
+        cmd if cmd.starts_with("rm") => {
+            let filename = cmd.trim_start_matches("rm");
+            if filename.is_empty() {
+                println!("No filename specified. Usage: rm <filename>");
+                return;
+            }
+            crate::fs::ext2::rmfile(filename);
         }
         cmd if cmd.starts_with("echo ") => {
             let message = cmd.trim_start_matches("echo ");

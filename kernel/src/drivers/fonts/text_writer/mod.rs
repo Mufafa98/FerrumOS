@@ -74,7 +74,6 @@ impl TextWriter {
     }
     /// Writes a newline to the framebuffer
     /// This function moves all the rows up by the height of a character
-    // TO DO : Optimize this function
     fn write_newline(&mut self) {
         // Get the height of a character
         let char_height = (self.font.get_height() * self.font_size_multiplier) as u64;
@@ -91,7 +90,6 @@ impl TextWriter {
         self.x_position = 0;
     }
     /// Clears a row of the framebuffer
-    // TO DO : Optimize this function
     fn clear_row(&mut self, row_start: u64) {
         for row in row_start..FRAMEBUFFER.get_height() {
             for col in 0..FRAMEBUFFER.get_width() {
