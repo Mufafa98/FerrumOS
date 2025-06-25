@@ -99,6 +99,25 @@ impl BlockGroupDescriptorTable {
         let bgd = &mut self.block_group_descriptors[bgd_index];
         bgd.directories_count += 1;
     }
+
+    pub fn inc_dir_count(&mut self, bgd_index: usize) {
+        if bgd_index >= self.block_group_descriptors.len() {
+            panic!("Block Group Descriptor index out of bounds");
+        }
+        let bgd = &mut self.block_group_descriptors[bgd_index];
+        bgd.directories_count += 1;
+    }
+    pub fn dec_dir_count(&mut self, bgd_index: usize) {
+        if bgd_index >= self.block_group_descriptors.len() {
+            panic!("Block Group Descriptor index out of bounds");
+        }
+        let bgd = &mut self.block_group_descriptors[bgd_index];
+        if bgd.directories_count == 0 {
+            panic!("Cannot decrement directories count below zero");
+        }
+        bgd.directories_count -= 1;
+    }
+
     unsafe fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         for bgd in &self.block_group_descriptors {

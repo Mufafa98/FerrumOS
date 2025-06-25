@@ -812,7 +812,7 @@ impl Inode {
                 panic!("Failed to write to disk");
             }
             let write_buf = &disk_data[512..1024];
-            let write_result = ata::write(0, (current_block + 1) as u32, &write_buf);
+            let write_result = ata::write(0, (current_block + 1).try_into().unwrap(), &write_buf);
             if write_result.is_err() {
                 panic!("Failed to write to disk");
             }

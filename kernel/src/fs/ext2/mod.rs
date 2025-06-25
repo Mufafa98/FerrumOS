@@ -146,6 +146,9 @@ enum DirEntryError {
     EntryDoesNotExist,
     EntryHasNoParent,
     ParentNotDirectory,
+    DirectoryNotEmpty,
+    InodeIsEmpty,
+    InodeDeallocationFailed,
 }
 
 #[derive(Debug, Clone)]
@@ -293,10 +296,11 @@ impl DirEntry {
 
         // 5. Increment dir count in BGDT if entry is a directory.
         if new_inode_type == InodeType::Directory {
-            let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-            let mut bgdt = BLOCK_GROUP_DESCRIPTOR_TABLE.lock();
-            let block_address = parent_inode.get_direct_block(0);
-            bgdt.inc_dir_count_block_address(block_address as usize, block_size as usize);
+            let inodes_per_group = SUPERBLOCK.lock().get_inodes_per_group() as u32;
+            let block_group_id = (entry_for_parent.inode - 1) / inodes_per_group;
+            BLOCK_GROUP_DESCRIPTOR_TABLE
+                .lock()
+                .inc_dir_count(block_group_id as usize);
         }
 
         let type_str = if new_inode_type == InodeType::Directory {
@@ -304,27 +308,14 @@ impl DirEntry {
         } else {
             "File"
         };
-        serial_println!(
-            "{} created: {} (inode {}) in parent {} (inode {})",
-            type_str,
-            entry_for_parent.name,
-            new_entry_inode.get_id(),
-            parent_path_str,
-            parent_inode.get_id()
-        );
 
         Ok(entry_for_parent)
     }
 
-    fn remove_fs_entry(path: &str, new_inode_type: InodeType) -> Result<(), DirEntryError> {
-        //todo implement rmdir
-        if new_inode_type != InodeType::RegularFile {
-            return Err(DirEntryError::UnsuportedEntryType);
-        }
-
+    fn remove_fs_entry(path: &str) -> Result<(), DirEntryError> {
         let trimmed_path = path.trim();
 
-        // 0. Determine parent path and new entry name
+        // Determine parent path and new entry name
         let (parent_path_str, entry_name_str) = {
             if let Some(idx) = trimmed_path.rfind('/') {
                 let p_path = &trimmed_path[..idx];
@@ -352,34 +343,56 @@ impl DirEntry {
             return Err(DirEntryError::EntryDoesNotExist);
         }
 
-        // 1. Get entryes for the parent directory and the entry to be removed.
-        let entry_to_remove_opt = find_by_path(trimmed_path);
-        let entry_to_remove = match entry_to_remove_opt {
-            Some(entry) => entry,
-            None => return Err(DirEntryError::EntryDoesNotExist),
-        };
-        let parent_dir_entry_opt = find_by_path(&parent_path_str);
-        let parent_dir_entry = match parent_dir_entry_opt {
-            Some(pde) => pde,
-            None => return Err(DirEntryError::EntryHasNoParent),
-        };
+        // 1. Get entries
+        let mut entry_to_remove =
+            find_by_path(trimmed_path).ok_or(DirEntryError::EntryDoesNotExist)?;
+        let parent_dir_entry =
+            find_by_path(&parent_path_str).ok_or(DirEntryError::EntryHasNoParent)?;
+
+        // 2. Load inodes
         let mut parent_inode = Inode::from_id(parent_dir_entry.inode as usize);
+        let mut target_inode = Inode::from_id(entry_to_remove.inode as usize);
+
+        // 3. Validate types
         if parent_inode.get_type() != InodeType::Directory {
             return Err(DirEntryError::ParentNotDirectory);
         }
+        match target_inode.get_type() {
+            InodeType::Directory => {
+                // 4. Check if the directory is empty (must only contain '.' and '..')
+                if get_files_in_dir(trimmed_path).len() > 2 {
+                    return Err(DirEntryError::DirectoryNotEmpty);
+                }
 
-        // 2. Remove the entry from the parent directory.
-        let mut entry_to_remove = entry_to_remove.clone();
-        entry_to_remove.remove_from_inode(&mut parent_inode);
-        serial_println!(
-            "Removing entry {} (inode {}) from parent {} (inode {})",
-            entry_to_remove.name,
-            entry_to_remove.inode,
-            parent_path_str,
-            parent_inode.get_id()
-        );
+                // 5. Remove the entry from the parent directory's data blocks.
+                entry_to_remove.remove_from_inode(&mut parent_inode);
 
-        Ok(())
+                // 6. Decrement link counts.
+                parent_inode.dec_hard_links_count(); // For '..'
+                target_inode.dec_hard_links_count(); // For '.'
+                target_inode.dec_hard_links_count(); // For its name in the parent dir.
+
+                // 7. Decrement directory count in the Block Group Descriptor Table.
+                let inodes_per_group = SUPERBLOCK.lock().get_inodes_per_group();
+                let block_group_id = (target_inode.get_id() - 1) / inodes_per_group;
+                BLOCK_GROUP_DESCRIPTOR_TABLE
+                    .lock()
+                    .dec_dir_count(block_group_id);
+                Ok(())
+            }
+            InodeType::RegularFile => {
+                // 4. Remove the entry from the parent directory.
+                let mut entry_to_remove = entry_to_remove.clone();
+                entry_to_remove.remove_from_inode(&mut parent_inode)?;
+                // 5. Decrement link counts.
+                target_inode.dec_hard_links_count();
+
+                Ok(())
+            }
+            _ => {
+                return Err(DirEntryError::UnsuportedEntryType);
+            }
+        }
     }
 
     fn size(&self) -> usize {
@@ -404,8 +417,7 @@ impl DirEntry {
         data
     }
 
-    fn remove_from_inode(&mut self, inode: &mut Inode) {
-        serial_println!("Removing entry {} from inode {}", self.name, inode.get_id());
+    fn remove_from_inode(&mut self, inode: &mut Inode) -> Result<(), DirEntryError> {
         fn dealloc_d(
             block_addr: u32,
             entry_to_remove: &DirEntry,
@@ -429,6 +441,7 @@ impl DirEntry {
                     // Found the entry.
                     let removed_entry_rec_len = entry.rec_len;
                     let empty_entry = entry_to_remove.empty_copy();
+
                     if current_offset == prev_entry_offset {
                         // Case 1: Removing the first entry in the block.
                         let inode_bytes = empty_entry.get_aligned_bytes();
@@ -523,59 +536,51 @@ impl DirEntry {
                 ]);
                 let found = dealloc_di(block_number, entry_to_remove, block_size).unwrap_or(false);
                 if found {
-                    // If we found and removed the entry, we can stop
                     return Ok(true);
                 }
             }
-            Ok(false) // Not found in this triply indirect block
+            Ok(false)
         }
 
         let block_size = SUPERBLOCK.lock().get_block_size() as u32;
 
-        let mut removed = false;
-
         for direct_block in inode.get_direct_blocks() {
             if *direct_block == 0 {
-                continue;
+                return Err(DirEntryError::InodeIsEmpty);
             }
             if dealloc_d(*direct_block, self, block_size).unwrap_or(false) {
-                removed = true;
+                return Ok(());
             }
         }
-        if inode.get_indirect_block() != 0 || !removed {
+        if inode.get_indirect_block() != 0 {
             if dealloc_i(inode.get_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
+                return Ok(());
             }
         }
-        if inode.get_doubly_indirect_block() != 0 || !removed {
+        if inode.get_doubly_indirect_block() != 0 {
             if dealloc_di(inode.get_doubly_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
+                return Ok(());
             }
         }
-        if inode.get_triply_indirect_block() != 0 || !removed {
+        if inode.get_triply_indirect_block() != 0 {
             if dealloc_ti(inode.get_triply_indirect_block(), self, block_size).unwrap_or(false) {
-                removed = true;
+                return Ok(());
             }
         }
-
-        let mut self_inode = Inode::from_id(self.inode as usize);
-        self_inode.dec_hard_links_count();
+        return Err(DirEntryError::InodeDeallocationFailed);
     }
 
     fn add_to_inode(&mut self, inode: &mut Inode) {
-        serial_println!("Adding entry {} to inode {}", self.name, inode.get_id());
         fn entry_on_d(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
             // Get the block size from the superblock
             // and read the block data
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
             let mut data = read_1kb_block(block, block_size);
             // Find the last entry in the directory
-            serial_println!("Searching for last entry in block {}", block);
             let mut entry = DirEntry::from_ptr(&data, 0);
             while entry.rec_len != 0 && entry.next < data.len() {
                 entry = DirEntry::from_ptr(&data, entry.next);
             }
-            serial_println!("Last entry found: {:?}", entry);
             let mut current_offset = 0;
             let mut next = 0;
             let mut remaining_space = data.len();
@@ -585,13 +590,6 @@ impl DirEntry {
                 remaining_space = data.len() - next;
             }
 
-            serial_println!(
-                "Current offset: {}, next: {}, remaining space: {}",
-                current_offset,
-                next,
-                remaining_space
-            );
-
             if remaining_space < new_entry.size() || block == 0 {
                 let new_block = inode.allocate_new_block();
                 if new_block == None {
@@ -599,31 +597,21 @@ impl DirEntry {
                     return;
                 }
                 let new_block = new_block.unwrap();
-                serial_println!(
-                    "No space left in block {}, allocating new block {}",
-                    block,
-                    new_block
-                );
                 data.fill(0);
                 new_entry.rec_len = data.len() as u16;
                 let new_entry_bytes = new_entry.get_aligned_bytes();
-                serial_println!("Adding new entry: {:?}", new_entry);
                 data[0..new_entry_bytes.len()].copy_from_slice(&new_entry_bytes);
                 write_1kb_block(new_block, block_size, &data, data.len());
             } else {
-                serial_println!("Adding entry to existing block {}", block);
                 if entry.inode != 0 {
-                    serial_println!("Updating last entry in block {}", block);
                     data[current_offset..].fill(0);
                     entry.rec_len = entry.size() as u16;
                     let old_entry_bytes = entry.get_aligned_bytes();
-                    serial_println!("Updated last entry: {:?}", entry);
                     data[current_offset..next].copy_from_slice(&old_entry_bytes);
                 }
 
                 new_entry.rec_len = (data.len() - next) as u16;
                 let new_entry_bytes = new_entry.get_aligned_bytes();
-                serial_println!("Adding new entry: {:?}", new_entry);
                 data[next..next + new_entry_bytes.len()].copy_from_slice(&new_entry_bytes);
 
                 write_1kb_block(block, block_size, &data, data.len());
@@ -718,19 +706,14 @@ impl DirEntry {
         }
 
         if inode.get_triply_indirect_block() != 0 {
-            serial_println!("Adding to triply indirect block");
             entry_on_t(inode.get_triply_indirect_block(), inode, self);
         } else if inode.get_doubly_indirect_block() != 0 {
-            serial_println!("Adding to doubly indirect block");
             entry_on_db(inode.get_doubly_indirect_block(), inode, self);
         } else if inode.get_indirect_block() != 0 {
-            serial_println!("Adding to indirect block");
             entry_on_i(inode.get_indirect_block(), inode, self);
         } else {
-            serial_println!("Adding to direct block");
             let direct_blocks = inode.get_direct_blocks();
             if direct_blocks.is_empty() {
-                serial_println!("No direct blocks found, allocating new block");
                 let new_block = inode
                     .allocate_new_block()
                     .expect("Failed to allocate new block");
@@ -1029,8 +1012,8 @@ pub fn ls(path: Option<&str>) {
     use alloc::format;
     let path = path.unwrap_or(".");
     let entries = get_files_in_dir(path);
+    println!("Listing files in directory: {}", path);
     for entry in entries.iter() {
-        // serial_println!("Entry: {:?}", entry);
         let inode = Inode::from_id_no_flush(entry.inode as usize);
         let entry_type = match DirEntryType::from_u8(entry.file_type) {
             DirEntryType::Directory => "DIR ",
@@ -1048,31 +1031,28 @@ pub fn ls(path: Option<&str>) {
 }
 
 pub fn touch(path: &str) {
-    // let entry = DirEntry::new_file(path);
     let entry = DirEntry::create_fs_entry(path, InodeType::RegularFile);
-    if entry.is_err() {
-        serial_println!("Failed to create file: {}", path);
-        return;
+
+    match entry {
+        Ok(entry) => println!("File {} created successfully", entry.name),
+        Err(err) => println!("Failed to create file: {}. Error: {:?}", path, err),
     }
-    serial_println!("File created: {:?}", entry);
 }
 
 pub fn mkdir(path: &str) {
     let entry = DirEntry::create_fs_entry(path, InodeType::Directory);
-    if entry.is_err() {
-        serial_println!("Failed to create directory: {}", path);
-        return;
+    match entry {
+        Ok(entry) => println!("Directory {} created successfully", entry.name),
+        Err(err) => println!("Failed to create directory: {}. Error: {:?}", path, err),
     }
-    serial_println!("Directory created: {:?}", entry);
 }
 
-pub fn rmfile(path: &str) {
-    let result = DirEntry::remove_fs_entry(path, InodeType::RegularFile);
-    if result.is_err() {
-        serial_println!("Failed to remove file: {}", path);
-        return;
+pub fn rm(path: &str) {
+    let result = DirEntry::remove_fs_entry(path);
+    match result {
+        Ok(_) => println!("Removed {} successfully", path),
+        Err(err) => println!("Failed to remove: {}. Error: {:?}", path, err),
     }
-    serial_println!("File removed: {}", path);
 }
 
 pub fn init() {

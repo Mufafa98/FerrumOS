@@ -20,15 +20,13 @@ pub fn execute_command(command: &str) {
             print!("\x1B[2J\x1B[1;1H"); // ANSI escape code to clear the screen
         }
         cmd if cmd.starts_with("ls") => {
+            use crate::fs::ext2::ls;
             let dir = cmd.trim_start_matches("ls");
-            // Here you would implement the logic to list files in the directory
-            // For now, we just print a placeholder message
             if dir.is_empty() {
-                println!("No directory specified, listing current directory:");
-                crate::fs::ext2::ls(None);
+                ls(None);
+            } else {
+                ls(Some(dir.trim()));
             }
-            crate::fs::ext2::ls(Some(dir.trim()));
-            // In a real implementation, you would read the directory and print its contents
         }
         cmd if cmd.starts_with("touch") => {
             let filename = cmd.trim_start_matches("touch");
@@ -52,7 +50,7 @@ pub fn execute_command(command: &str) {
                 println!("No filename specified. Usage: rm <filename>");
                 return;
             }
-            crate::fs::ext2::rmfile(filename);
+            crate::fs::ext2::rm(filename);
         }
         cmd if cmd.starts_with("echo ") => {
             let message = cmd.trim_start_matches("echo ");
