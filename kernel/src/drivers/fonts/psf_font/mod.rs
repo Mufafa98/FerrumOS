@@ -16,6 +16,8 @@ pub struct PsfFont {
     height: u32,
     width: u32,
     glyphs: Glyphs,
+    padding_before: u64,
+    padding_after: u64,
 }
 
 impl PsfFont {
@@ -42,6 +44,8 @@ impl PsfFont {
             height,
             width,
             glyphs,
+            padding_before: 0, // Default padding before
+            padding_after: 0,  // Default padding after
         };
 
         result
@@ -52,7 +56,13 @@ impl PsfFont {
     }
     /// Gets the width of the font
     pub fn get_width(&self) -> u32 {
-        self.width
+        self.width + self.padding_before as u32 + self.padding_after as u32
+    }
+    pub fn set_padding_before(&mut self, padding: u64) {
+        self.padding_before = padding;
+    }
+    pub fn set_padding_after(&mut self, padding: u64) {
+        self.padding_after = padding;
     }
     /// Displays a character on the framebuffer at the given position with the given colors
     pub fn display_char(
@@ -65,14 +75,38 @@ impl PsfFont {
         font_size_multiplier: u64,
     ) {
         let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
-        for row in 0..16_u64 {
-            for col in 0..8_u64 {
-                let bit = glyph[row as usize] & (1 << (7 - col));
+
+        let font_height = self.get_height() as u64;
+        let font_width =
+            self.get_width() as u64 - self.padding_before as u64 - self.padding_after as u64;
+
+        let padding_before = self.padding_before as u64;
+        let padding_after = self.padding_after as u64;
+
+        for row in 0..font_height {
+            let total_cell_width = font_width + padding_before + padding_after;
+            for col in 0..total_cell_width {
+                let color;
+
+                if col >= padding_before && col < padding_before + font_width {
+                    let glyph_col = col - padding_before;
+                    let bit = glyph[row as usize] & (1 << (font_width - 1 - glyph_col));
+                    color = {
+                        if bit != 0 {
+                            fg_color
+                        } else {
+                            bg_color
+                        }
+                    };
+                } else {
+                    color = bg_color;
+                }
+
                 let pixel_coord = (
                     position.0 + col * font_size_multiplier,
                     position.1 + row * font_size_multiplier,
                 );
-                let color = if bit != 0 { fg_color } else { bg_color };
+                // let color = if bit != 0 { fg_color } else { bg_color };
                 framebuffer.put_pixel_on_square(
                     pixel_coord.0,
                     pixel_coord.1,
@@ -82,6 +116,100 @@ impl PsfFont {
             }
         }
     }
+
+    pub fn display_bold_char(
+        &self,
+        character: char,
+        framebuffer: &FrameBuffer,
+        position: (u64, u64),
+        fg_color: u32,
+        bg_color: u32,
+        font_size_multiplier: u64,
+    ) {
+        // TODO: Better document
+        todo!("Bold rendering is not implemented yet");
+        // For bitmap fonts, a bold effect is usually achieved by drawing the character
+        // twice with a 1-pixel horizontal offset.
+        // Setting BOLD_OFFSET to 1 is generally sufficient.
+        const BOLD_OFFSET: u64 = 1; // How many pixels to offset the second drawing
+
+        let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
+
+        let font_height = self.get_height() as u64;
+        let font_width = self.width as u64;
+
+        // Draw the background for the entire cell first
+        // The cell width should account for the bold offset if the font is monospace
+        // and you want the cell to expand for bold characters.
+        // If you always draw characters within a fixed-width cell, this part might need adjustment
+        // based on how your terminal handles cell width.
+        let effective_char_width = font_width + BOLD_OFFSET; // Account for the bold rendering
+
+        for row in 0..font_height {
+            for col in 0..effective_char_width {
+                // Loop over the potentially expanded width
+                let pixel_coord = (
+                    position.0 + col * font_size_multiplier,
+                    position.1 + row * font_size_multiplier,
+                );
+                framebuffer.put_pixel_on_square(
+                    pixel_coord.0,
+                    pixel_coord.1,
+                    bg_color, // Draw background for the whole cell first
+                    font_size_multiplier,
+                );
+            }
+        }
+
+        // --- Draw the character (foreground) ---
+
+        // First pass: Draw the regular character
+        for row in 0..font_height {
+            for col in 0..font_width {
+                let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
+                if bit != 0 {
+                    let pixel_coord = (
+                        position.0 + col * font_size_multiplier,
+                        position.1 + row * font_size_multiplier,
+                    );
+                    framebuffer.put_pixel_on_square(
+                        pixel_coord.0,
+                        pixel_coord.1,
+                        fg_color,
+                        font_size_multiplier,
+                    );
+                }
+            }
+        }
+
+        // Second pass: Draw the character again, offset to the right by BOLD_OFFSET
+        // This creates the bold effect by thickening the strokes.
+        for row in 0..font_height {
+            for col in 0..font_width {
+                let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
+                if bit != 0 {
+                    // Ensure we don't draw outside the logical character cell if BOLD_OFFSET is too large.
+                    // For most monospace fonts, BOLD_OFFSET of 1 is fine and often extends slightly.
+                    let offset_col = col + BOLD_OFFSET;
+                    // You might want to cap `offset_col` at `font_width` or `effective_char_width - 1`
+                    // if you absolutely want to contain the bold effect within the original font_width.
+                    // However, for true bolding, letting it spill over slightly is typical.
+
+                    let pixel_coord = (
+                        position.0 + offset_col * font_size_multiplier,
+                        position.1 + row * font_size_multiplier,
+                    );
+                    framebuffer.put_pixel_on_square(
+                        pixel_coord.0,
+                        pixel_coord.1,
+                        fg_color,
+                        font_size_multiplier,
+                    );
+                }
+            }
+        }
+    }
+
     /// Gets the glyph data for the given index
     fn get_glyph(&self, index: u32) -> [u8; 16] {
         let mut glyph = [0; 16];

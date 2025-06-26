@@ -1,4 +1,6 @@
+use crate::ok;
 use crate::println;
+use crate::serial_println;
 use crate::utils::msr::*;
 use crate::utils::registers::*;
 static IA32_APIC_BASE_MSR: u32 = 0x1b;
@@ -36,15 +38,14 @@ impl LocalAPIC {
     }
     pub fn read_register(&self, register: LAPICReg) -> u32 {
         let offset = register as u64;
-        unsafe {
-            return *((self.base_address + offset) as *const u32);
-        }
+        let ptr = (self.base_address + offset) as *const u32;
+        unsafe { core::ptr::read_volatile(ptr) }
     }
     pub fn write_register(&self, register: LAPICReg, value: u32) {
         let offset = register as u64;
+        let ptr = (self.base_address + offset) as *mut u32;
         unsafe {
-            let ptr = (self.base_address + offset) as *mut u32;
-            *ptr = value;
+            core::ptr::write_volatile(ptr, value);
         }
     }
     // TO DO consider removing those in favor of read_register and write_register
@@ -91,5 +92,8 @@ pub fn init() {
     // 0xFF  -> Set the vector
     let spourious_interrupt_vector = LOCAL_APIC.get_spurious_interrupt_vector() | 0x1FF;
     LOCAL_APIC.set_spurious_interrupt_vector(spourious_interrupt_vector);
-    println!("LAPIC[{}] Enabled", LOCAL_APIC.get_id());
+    // A delay is needed to ensure the APIC is ready
+    // TODO, find a better way to ensure the APIC is ready
+    serial_println!();
+    ok!("LAPIC[{}] Enabled", LOCAL_APIC.get_id());
 }

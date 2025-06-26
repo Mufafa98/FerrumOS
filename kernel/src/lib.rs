@@ -10,6 +10,7 @@ pub mod fs;
 pub mod gdt;
 pub mod interrupts;
 pub mod io;
+pub mod macros;
 pub mod memory;
 pub mod shell;
 pub mod task;
@@ -47,10 +48,16 @@ pub fn init() {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init() };
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
+    ok!("GDT initialized");
+    ok!("IDT initialized");
+    ok!("Interrupts enabled");
+    ok!("Level 4 page table initialized");
+    ok!("Heap initialized");
+
     let kernel_address = KERNEL_ADDRESS_REQUEST.get_response().expect("nu merge");
     // println!("Kernel phys address: {:#X}", kernel_address.physical_base());
-    serial_println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
-    println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
+    // serial_println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
+    // println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
 
     drivers::apic::local_apic::init();
     drivers::apic::io_apic::init();

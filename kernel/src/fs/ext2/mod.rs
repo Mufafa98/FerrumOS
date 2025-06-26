@@ -2,7 +2,7 @@ use alloc::vec;
 use core::usize;
 
 use crate::fs::ext2::inode::build_inode;
-use crate::{drivers::*, print, println};
+use crate::{drivers::*, ok, print, println};
 use crate::{serial_print, serial_println};
 use spin::mutex::Mutex;
 
@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 mod superblock_data_types;
 
 mod bgdt;
-mod file;
+pub mod file;
 mod inode;
 mod superblock;
 
@@ -37,17 +37,17 @@ fn print_hex(buffer: &[u8]) {
     }
 }
 
-fn buffer_to_string(buffer: &[u8]) -> String {
-    let string = String::new();
-    for i in 0..buffer.len() {
-        if buffer[i] == 0 {
-            continue;
-        }
-        // string.push(buffer[i] as char);
-        serial_print!("{}", buffer[i] as char);
-    }
-    string
-}
+// pub fn buffer_to_string(buffer: &[u8]) -> String {
+//     let string = String::new();
+//     for i in 0..buffer.len() {
+//         if buffer[i] == 0 {
+//             continue;
+//         }
+//         // string.push(buffer[i] as char);
+//         serial_print!("{}", buffer[i] as char);
+//     }
+//     string
+// }
 
 pub fn read_1kb_block(block_number: u32, block_size: u32) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
@@ -732,6 +732,13 @@ impl DirEntry {
     }
 }
 
+pub struct FileData {
+    pub entry_type: String,
+    pub size: usize,
+    pub name: String,
+    pub inode: usize,
+}
+
 // Finds a file in the root directory
 fn find_file_in_dir(file_name: &str, root_inode: Inode) -> Option<DirEntry> {
     let block_size = SUPERBLOCK.lock().get_block_size() as u32;
@@ -1008,11 +1015,13 @@ fn get_files_in_dir(path: &str) -> Vec<DirEntry> {
     entries
 }
 
-pub fn ls(path: Option<&str>) {
+pub fn ls(path: Option<&str>) -> Vec<FileData> {
     use alloc::format;
     let path = path.unwrap_or(".");
     let entries = get_files_in_dir(path);
-    println!("Listing files in directory: {}", path);
+
+    let mut result: Vec<FileData> = Vec::new();
+
     for entry in entries.iter() {
         let inode = Inode::from_id_no_flush(entry.inode as usize);
         let entry_type = match DirEntryType::from_u8(entry.file_type) {
@@ -1026,8 +1035,15 @@ pub fn ls(path: Option<&str>) {
             DirEntryType::Unknown => "UNKN",
         };
         let size = inode.get_size();
-        println!("{:<5} {:<20} {:>10} bytes", entry_type, entry.name, size);
+        result.push(FileData {
+            entry_type: entry_type.to_string(),
+            size: size,
+            name: entry.name.clone(),
+            inode: inode.get_id(),
+        });
+        // result += format!("{:<5} {:<20} {:>10} bytes", entry_type, entry.name, size);
     }
+    result
 }
 
 pub fn touch(path: &str) {
@@ -1053,47 +1069,4 @@ pub fn rm(path: &str) {
         Ok(_) => println!("Removed {} successfully", path),
         Err(err) => println!("Failed to remove: {}. Error: {:?}", path, err),
     }
-}
-
-pub fn init() {
-
-    // let test_file = File::from_path("1234");
-    // let lorem_ipsum = File::from_path("let");
-
-    // if test_file.is_err() {
-    //     panic!("Error at creating file {:?}", test_file.err());
-    // }
-    // if lorem_ipsum.is_err() {
-    //     panic!("Error at creating file {:?}", lorem_ipsum.err());
-    // }
-
-    // let mut lorem_ipsum = lorem_ipsum.unwrap();
-    // let mut test_file = test_file.unwrap();
-
-    // let mut written = 0;
-    // let mut readen = 0;
-    // let bytes_written = 0;
-    // let mut temp = 0;
-    // loop {
-    //     let mut buffer = [0u8; 1024];
-    //     let bytes_read = lorem_ipsum.read(&mut buffer, 1024);
-    //     if bytes_read == 0 {
-    //         break;
-    //     }
-    //     let bytes_written = test_file.write(&buffer, bytes_read);
-
-    //     written += bytes_written;
-    //     readen += bytes_read;
-    //     temp += 1;
-    // }
-
-    // serial_println!("\nDone writing {} bytes of {} {}\n", written, readen, temp);
-
-    // test_file.seek(0);
-    // let mut buffer = [0u8; 1024];
-    // while test_file.read(&mut buffer, 1024) != 0 {
-    //     for i in 0..1024 {
-    //         serial_print!("{}", buffer[i] as char);
-    //     }
-    // }
 }

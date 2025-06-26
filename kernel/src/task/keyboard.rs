@@ -105,7 +105,9 @@ pub async fn print_keypresses() {
                     DecodedKey::Unicode(character) => {
                         if character == '\n' {
                             print!("\n");
-                            crate::shell::execute_command(&LAST_COMMAND.lock());
+                            crate::shell::SHELL.execute_command(&LAST_COMMAND.lock());
+                            // crate::shell::execute_command(&LAST_COMMAND.lock());
+                            crate::shell::print_caret();
                             LAST_COMMAND.lock().clear();
                         } else if character == '\x08' {
                             // Backspace

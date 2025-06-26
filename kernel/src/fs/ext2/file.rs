@@ -239,4 +239,8 @@ impl File {
         }
         self.offset = offset;
     }
+
+    pub fn seek_end(&mut self) {
+        self.offset = self.inode.get_size() as usize;
+    }
 }

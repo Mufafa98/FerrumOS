@@ -1,4 +1,6 @@
 //! Fonts module.
+pub mod ansii_parser;
+pub mod color;
 pub mod psf_font;
 pub mod text_writer;
 

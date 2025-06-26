@@ -15,6 +15,10 @@ pub fn lapic_calibrate() -> u32 {
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
     LAPICTimer::set_ticks(ticks);
     LAPICTimer::set_active(false);
+    ok!(
+        "LAPICTimer calibrated with a frequency of {} MHz",
+        ticks / 10000
+    );
     return ticks;
 }
 #[derive(Debug, Copy, Clone)]
@@ -30,6 +34,7 @@ enum LAPICTimerDivideValue {
 }
 use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
 use crate::interrupts::InterruptIndexAPIC;
+use crate::ok;
 // use crate::{print, serial_println};
 pub struct LAPICTimer {}
 impl LAPICTimer {

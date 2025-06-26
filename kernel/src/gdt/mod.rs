@@ -10,6 +10,8 @@ use x86_64::{
     },
     VirtAddr,
 };
+
+use crate::ok;
 /// Initialize the GDT with the code and TSS segments
 pub fn init() {
     use x86_64::instructions::segmentation::{Segment, CS, DS, SS};

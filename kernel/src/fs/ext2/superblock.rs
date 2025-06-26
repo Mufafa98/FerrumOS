@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::serial_println;
+use crate::{ok, serial_println};
 
 use super::superblock_data_types as sbdt;
 

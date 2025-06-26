@@ -1,6 +1,6 @@
 extern crate alloc;
 use crate::utils::port::*;
-use crate::{println, serial_println};
+use crate::{failed, ok, println, serial_println, warn};
 use alloc::format;
 use alloc::vec::Vec;
 use bit_field::BitField;
@@ -160,7 +160,7 @@ impl Bus {
         use crate::timer::Time;
         let hpet_timer = HPETTimer::new();
         let debug_str = format!(
-            "[ATA_{}]: ",
+            "ATA {} ",
             if drive == Drive::Master {
                 "Master"
             } else {
@@ -188,18 +188,14 @@ impl Bus {
             self.ata_reg.lba0_register.write(0);
             self.ata_reg.lba1_register.write(0);
             self.ata_reg.lba2_register.write(0);
-            // serial_println!("Setting up registers");
-            println!("{}Setting up registers", debug_str);
             self.ata_reg.command_register.write(Command::Identify as u8);
-            // serial_println!("Sent Identify Command");
-            println!("{}Sent Identify Command", debug_str);
             hpet_timer.sleep(Time::Nanoseconds(400));
 
             let mut status = self.ata_reg.alternate_status_register.read();
             let error = self.ata_reg.error_register.read();
 
             if status == 0x00 {
-                println!("{}Drive not found", debug_str);
+                warn!("{}Drive not found", debug_str);
                 return Err(BusError::NoDrive);
             }
             loop {
@@ -208,12 +204,10 @@ impl Bus {
                     break;
                 }
             }
-            // serial_println!("Drive found");
-            println!("{}Drive found", debug_str);
             let lba_mid = self.ata_reg.lba1_register.read();
             let lba_high = self.ata_reg.lba2_register.read();
             if lba_mid != 0 || lba_high != 0 {
-                println!("{}Drive is not ATA", debug_str);
+                warn!("{}Drive is not ATA", debug_str,);
                 return Err(BusError::DriveNotAta);
             }
 
@@ -223,12 +217,12 @@ impl Bus {
                     break;
                 }
                 if status.get_bit(Status::ERR as usize) {
-                    println!("{}Unable to read from drive", debug_str);
+                    // println!("{}Unable to read from drive", debug_str);
+                    failed!("{}Unable to read from drive", debug_str);
                     return Err(BusError::UnableToRead);
                 }
             }
-            // serial_println!("Drive is ready");
-            println!("{}Drive is ready", debug_str);
+            ok!("{}Drive is ready", debug_str);
 
             let mut buf = [0u16; 256];
             for i in 0..256 {
@@ -249,7 +243,7 @@ impl Bus {
                 lba48 |= (buf[100] as u64) << 0;
                 self.lba48_adr_sectors = Some(lba48);
             }
-            println!("{}Everything is ok", debug_str);
+            ok!("{}Successfully identified drive", debug_str);
             return Ok(());
         }
     }

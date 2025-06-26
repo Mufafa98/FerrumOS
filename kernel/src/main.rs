@@ -2,7 +2,7 @@
 #![no_main]
 
 use alloc::string::{String, ToString};
-use ferrum_os::*;
+use ferrum_os::{drivers::fonts::ansii_parser::ansii_builder::AnsiiString, *};
 use task::{executor, keyboard, Task};
 use timer::Time;
 
@@ -19,12 +19,10 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 unsafe extern "C" fn _start() -> ! {
     ferrum_os::init();
     welcome();
+    shell::print_caret();
 
-    // serial_println!("Testing");
-    // hpet();
-    // serial_println!("Done");
-
-    crate::fs::ext2::init();
+    println!("{} {} {}", "Test", "Bold".bold(), "Text");
+    println!("{} {} {}", "Test", "Bold", "Text");
 
     let mut executor = executor::Executor::new();
     executor.spawn(Task::new(keyboard::print_keypresses()));
@@ -66,7 +64,7 @@ fn welcome() {
         features,
         separator = "-".repeat(title.len())
     );
-    println!("Welcome to FerrumOs");
+    println!("{}", "Welcome to FerrumOs");
 }
 fn _test_timer_old() {
     use timer::lapic::*;
