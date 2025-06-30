@@ -126,28 +126,19 @@ impl PsfFont {
         bg_color: u32,
         font_size_multiplier: u64,
     ) {
-        // TODO: Better document
-        todo!("Bold rendering is not implemented yet");
-        // For bitmap fonts, a bold effect is usually achieved by drawing the character
-        // twice with a 1-pixel horizontal offset.
-        // Setting BOLD_OFFSET to 1 is generally sufficient.
-        const BOLD_OFFSET: u64 = 1; // How many pixels to offset the second drawing
+        const BOLD_OFFSET: u64 = 1;
 
         let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
 
         let font_height = self.get_height() as u64;
         let font_width = self.width as u64;
 
-        // Draw the background for the entire cell first
-        // The cell width should account for the bold offset if the font is monospace
-        // and you want the cell to expand for bold characters.
-        // If you always draw characters within a fixed-width cell, this part might need adjustment
-        // based on how your terminal handles cell width.
-        let effective_char_width = font_width + BOLD_OFFSET; // Account for the bold rendering
+        let effective_char_width = font_width + BOLD_OFFSET;
+
+        // Draw background first
 
         for row in 0..font_height {
             for col in 0..effective_char_width {
-                // Loop over the potentially expanded width
                 let pixel_coord = (
                     position.0 + col * font_size_multiplier,
                     position.1 + row * font_size_multiplier,
@@ -155,15 +146,14 @@ impl PsfFont {
                 framebuffer.put_pixel_on_square(
                     pixel_coord.0,
                     pixel_coord.1,
-                    bg_color, // Draw background for the whole cell first
+                    bg_color,
                     font_size_multiplier,
                 );
             }
         }
 
-        // --- Draw the character (foreground) ---
+        // draw character
 
-        // First pass: Draw the regular character
         for row in 0..font_height {
             for col in 0..font_width {
                 let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
@@ -182,18 +172,13 @@ impl PsfFont {
             }
         }
 
-        // Second pass: Draw the character again, offset to the right by BOLD_OFFSET
-        // This creates the bold effect by thickening the strokes.
+        // draw bold effect
+
         for row in 0..font_height {
             for col in 0..font_width {
                 let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
                 if bit != 0 {
-                    // Ensure we don't draw outside the logical character cell if BOLD_OFFSET is too large.
-                    // For most monospace fonts, BOLD_OFFSET of 1 is fine and often extends slightly.
                     let offset_col = col + BOLD_OFFSET;
-                    // You might want to cap `offset_col` at `font_width` or `effective_char_width - 1`
-                    // if you absolutely want to contain the bold effect within the original font_width.
-                    // However, for true bolding, letting it spill over slightly is typical.
 
                     let pixel_coord = (
                         position.0 + offset_col * font_size_multiplier,

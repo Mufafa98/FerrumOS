@@ -1,5 +1,5 @@
 //! Keyboard task module
-use crate::{print, println};
+use crate::{ok, print, println};
 use alloc::string::String;
 use conquer_once::spin::OnceCell;
 use core::{
@@ -79,11 +79,6 @@ impl Stream for ScancodeStream {
 /// The waker for the keyboard task
 static WAKER: AtomicWaker = AtomicWaker::new();
 
-lazy_static!(
-    /// Last command
-    pub static ref LAST_COMMAND: Mutex<String> = Mutex::new(String::new());
-);
-
 /// Print keypresses
 pub async fn print_keypresses() {
     // Create a new scancode stream
@@ -100,31 +95,9 @@ pub async fn print_keypresses() {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             // If the scancode was added, try to get the key
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                // If the key was found, print it
-                match key {
-                    DecodedKey::Unicode(character) => {
-                        if character == '\n' {
-                            print!("\n");
-                            crate::shell::SHELL.execute_command(&LAST_COMMAND.lock());
-                            // crate::shell::execute_command(&LAST_COMMAND.lock());
-                            crate::shell::print_caret();
-                            LAST_COMMAND.lock().clear();
-                        } else if character == '\x08' {
-                            // Backspace
-                            let mut last_command = LAST_COMMAND.lock();
-                            if !last_command.is_empty() {
-                                last_command.pop();
-                                print!("\x08 \x08");
-                            }
-                        } else {
-                            LAST_COMMAND.lock().push(character);
-                            print!("{}", character);
-                        }
-                    }
-                    DecodedKey::RawKey(key) => {
-                        // print!("{:?}", key);
-                    }
-                }
+                crate::shell::input_dispatcher::INPUT_DISPATCHER
+                    .lock()
+                    .dispatch_key(key);
             }
         }
     }

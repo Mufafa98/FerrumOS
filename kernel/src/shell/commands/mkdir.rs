@@ -1,9 +1,9 @@
-use crate::shell::Command;
+use crate::shell::{Command, Shell};
 use crate::{print, println};
 use alloc::vec::Vec;
 pub struct MkdirCommand;
 impl Command for MkdirCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         if args.is_empty() {
             println!("Usage: mkdir <directory_name1> [<directory_name2> ...]");
             return;

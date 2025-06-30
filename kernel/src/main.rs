@@ -2,7 +2,7 @@
 #![no_main]
 
 use alloc::string::{String, ToString};
-use ferrum_os::{drivers::fonts::ansii_parser::ansii_builder::AnsiiString, *};
+use ferrum_os::{drivers::fonts::ansii_parser::ansii_builder::AnsiiString, task::demo_task, *};
 use task::{executor, keyboard, Task};
 use timer::Time;
 
@@ -21,12 +21,12 @@ unsafe extern "C" fn _start() -> ! {
     welcome();
     shell::print_caret();
 
-    println!("{} {} {}", "Test", "Bold".bold(), "Text");
-    println!("{} {} {}", "Test", "Bold", "Text");
-
-    let mut executor = executor::Executor::new();
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
+    {
+        use crate::task::GLOBAL_EXECUTOR;
+        let mut executor = GLOBAL_EXECUTOR.lock();
+        executor.spawn(Task::new(keyboard::print_keypresses()));
+    }
+    executor::run_executor();
 }
 
 fn calibrate() {

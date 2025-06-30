@@ -1,10 +1,10 @@
-use crate::shell::Command;
+use crate::shell::{Command, Shell};
 use crate::{print, println};
 use alloc::vec::Vec;
 
 pub struct TouchCommand;
 impl Command for TouchCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         if args.is_empty() {
             println!("Usage: touch <file_name>");
             return;

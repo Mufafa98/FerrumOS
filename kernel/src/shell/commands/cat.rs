@@ -1,9 +1,9 @@
-use crate::shell::Command;
+use crate::shell::{Command, Shell};
 use crate::{print, println};
 use alloc::vec::Vec;
 pub struct CatCommand;
 impl Command for CatCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         if args.is_empty() {
             println!("Usage: cat <file>");
             return;
@@ -43,7 +43,6 @@ impl Command for CatCommand {
     }
 
     fn manual(&self) -> &str {
-        
         "Usage: cat <file> [<file> ...]\n\n\
         Displays the contents of the specified file(s)."
     }

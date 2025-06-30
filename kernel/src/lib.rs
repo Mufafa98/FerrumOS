@@ -65,6 +65,8 @@ pub fn init() {
     drivers::ata::init();
 }
 
+
+
 /// Performant empty loop thet saves cpu time
 pub fn hlt_loop() -> ! {
     loop {

@@ -21,6 +21,27 @@ pub fn lapic_calibrate() -> u32 {
     );
     return ticks;
 }
+
+fn lapic_calibrate_ticks() -> u32 {
+    use super::pit::PIT;
+    // use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
+    let measure_duration: u32 = 10;
+    let max_ticks = 0xFFFFFFFF;
+    LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
+    LAPICTimer::set_ticks(max_ticks);
+    PIT::sleep(measure_duration as u64);
+    LAPICTimer::set_active(false);
+    let ticks_raw = max_ticks - LAPICTimer::get_current_ticks();
+    let ticks = ticks_raw;
+    // serial_println!("Ticks per 10ms: {}", ticks);
+    LAPICTimer::set_lvt();
+    LAPICTimer::set_periodic(true);
+    LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
+    LAPICTimer::set_ticks(ticks);
+    LAPICTimer::set_active(false);
+    return ticks / 10000; // Return ticks per ms
+}
+
 #[derive(Debug, Copy, Clone)]
 enum LAPICTimerDivideValue {
     Div2 = 0b0000,
@@ -34,7 +55,7 @@ enum LAPICTimerDivideValue {
 }
 use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
 use crate::interrupts::InterruptIndexAPIC;
-use crate::ok;
+use crate::{ok, serial_println};
 // use crate::{print, serial_println};
 pub struct LAPICTimer {}
 impl LAPICTimer {
@@ -78,9 +99,12 @@ impl LAPICTimer {
     pub fn sleep(millis: u64) {
         use crate::interrupts::handlers::{LAPIC_TIMER_SLEEP_COUNTER, LAPIC_TIMER_SLEEP_FLAG};
         use core::sync::atomic::Ordering;
-        LAPIC_TIMER_SLEEP_COUNTER.store(millis as i64, Ordering::Relaxed);
+
+        LAPIC_TIMER_SLEEP_COUNTER.store(millis, Ordering::Relaxed);
         LAPIC_TIMER_SLEEP_FLAG.store(true, Ordering::Relaxed);
-        LAPICTimer::set_ticks(LAPICTimer::get_ticks());
+        let ticks = lapic_calibrate_ticks();
+        serial_println!("Sleeping for {} ticks", ticks);
+        LAPICTimer::set_ticks(ticks);
         LAPICTimer::set_periodic(true);
         LAPICTimer::set_active(true);
         while LAPIC_TIMER_SLEEP_COUNTER.load(Ordering::Relaxed) > 0 {
@@ -88,5 +112,17 @@ impl LAPICTimer {
         }
         LAPIC_TIMER_SLEEP_FLAG.store(false, Ordering::Relaxed);
         LAPICTimer::set_active(false);
+    }
+    pub fn start_periodic_timer() {
+        use crate::interrupts::handlers::{LAPIC_TIMER_SLEEP_COUNTER, LAPIC_TIMER_SLEEP_FLAG};
+        use core::sync::atomic::Ordering;
+
+        // LAPIC_TIMER_SLEEP_COUNTER.store(0, Ordering::Relaxed);
+        // LAPIC_TIMER_SLEEP_FLAG.store(true, Ordering::Relaxed);
+        let ticks = lapic_calibrate_ticks();
+        LAPICTimer::set_ticks(ticks);
+        LAPICTimer::set_periodic(true);
+        LAPICTimer::set_active(true);
+        serial_println!("LAPICTimer started with {} ticks per ms", ticks);
     }
 }

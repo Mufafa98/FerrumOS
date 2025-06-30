@@ -10,66 +10,75 @@ use spin::Mutex;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 
-mod cat;
-mod clear;
-mod echo;
-mod help;
-mod ls;
-mod mkdir;
-mod rm;
-mod touch;
-mod write;
+pub mod commands;
+pub mod input_dispatcher;
+use commands::*;
 
 trait Command: Send + Sync {
-    fn execute(&self, args: Vec<&str>);
+    fn execute(&self, args: Vec<&str>, shell: &Shell);
     fn description(&self) -> &str;
     fn name(&self) -> &str;
     fn manual(&self) -> &str;
 }
 
+macro_rules! add_commands {
+    ($commands:ident, $($module:ident => $struct:ident),* $(,)?) => {
+        $(
+            $commands.insert(
+                stringify!($module).to_string(),
+                Box::new($module::$struct) as Box<dyn Command>,
+            );
+        )*
+    };
+}
+
 pub struct Shell {
     commands: BTreeMap<String, Box<dyn Command>>,
+    key_buffer: String,
 }
 impl Shell {
     pub fn new() -> Self {
         let mut commands = BTreeMap::new();
-        commands.insert(
-            "clear".to_string(),
-            Box::new(clear::ClearCommand) as Box<dyn Command>,
+        add_commands!(commands,
+            clear => ClearCommand,
+            help => HelpCommand,
+            echo => EchoCommand,
+            cat => CatCommand,
+            ls => LsCommand,
+            mkdir => MkdirCommand,
+            rm => RmCommand,
+            touch => TouchCommand,
+            write => WriteCommand,
+            exec => ExecCommand,
+            kill => KillCommand,
+            ps => PsCommand,
         );
-        commands.insert(
-            "help".to_string(),
-            Box::new(help::HelpCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "echo".to_string(),
-            Box::new(echo::EchoCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "cat".to_string(),
-            Box::new(cat::CatCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "ls".to_string(),
-            Box::new(ls::LsCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "mkdir".to_string(),
-            Box::new(mkdir::MkdirCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "rm".to_string(),
-            Box::new(rm::RmCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "touch".to_string(),
-            Box::new(touch::TouchCommand) as Box<dyn Command>,
-        );
-        commands.insert(
-            "write".to_string(),
-            Box::new(write::WriteCommand) as Box<dyn Command>,
-        );
-        Shell { commands }
+        Shell {
+            commands,
+            key_buffer: String::new(),
+        }
+    }
+
+    pub fn handle_input(&mut self, key: pc_keyboard::DecodedKey) {
+        match key {
+            pc_keyboard::DecodedKey::Unicode(c) => {
+                if c == '\n' {
+                    println!();
+                    self.execute_command(&self.key_buffer);
+                    self.key_buffer.clear();
+                    print_caret();
+                } else if c == '\x08' || c == '\x7f' {
+                    self.key_buffer.pop();
+                    print!("\x08 \x08");
+                } else {
+                    self.key_buffer.push(c);
+                    print!("{}", c);
+                }
+            }
+            _ => {
+                println!("Unsupported key: {:?}", key);
+            }
+        }
     }
 
     pub fn execute_command(&self, command: &str) {
@@ -79,8 +88,7 @@ impl Shell {
         let args: Vec<&str> = parts;
         serial_println!("Executing command: {:?}", command);
         if let Some(cmd) = self.commands.get(command) {
-            // cmd.execute(args.is_empty().then(|| None).unwrap_or(Some(&args)));
-            cmd.execute(args);
+            cmd.execute(args, self);
         } else {
             println!("Command not found: {}", command);
         }
@@ -95,12 +103,21 @@ impl Shell {
             );
         }
     }
+
+    pub fn get_commands(&self) -> &BTreeMap<String, Box<dyn Command>> {
+        &self.commands
+    }
 }
 
-lazy_static!(
-    /// Last command
-    pub static ref SHELL: Shell = Shell::new();
-);
+// lazy_static!(
+//     /// Last command
+//     pub static ref SHELL: Shell = Shell::new();
+// );
+
+lazy_static! {
+    /// Global shell instance
+    pub static ref SHELL: Mutex<Shell> = Mutex::new(Shell::new());
+}
 
 pub fn print_caret() {
     print!("\x1B[s\r\x1B[1D{}\x1B[u", ">".fg(colors::LIGHT_CYAN));

@@ -117,19 +117,57 @@ pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptSta
     LOCAL_APIC.set_eoi();
 }
 pub static LAPIC_TIMER_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
-pub static LAPIC_TIMER_SLEEP_COUNTER: AtomicI64 = AtomicI64::new(0);
-pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
-    // print!(".");
+pub static LAPIC_TIMER_SLEEP_COUNTER: AtomicU64 = AtomicU64::new(0);
+pub extern "x86-interrupt" fn lapic_timer_handler_old(_stack_frame: InterruptStackFrame) {
     if LAPIC_TIMER_SLEEP_FLAG.load(Ordering::Relaxed) {
         let ptr = LAPIC_TIMER_SLEEP_COUNTER.as_ptr();
-        unsafe { *ptr = LAPIC_TIMER_SLEEP_COUNTER.load(Ordering::Relaxed) - 1 };
+        LAPIC_TIMER_SLEEP_COUNTER.fetch_sub(1, Ordering::Relaxed);
     }
+
     LOCAL_APIC.set_eoi();
-} // TO DO : Swap to AtomicU64
+}
+
+//
+
+//
+pub struct SleepEntry {
+    pub remaining: u64,
+    pub waker: core::task::Waker,
+}
+use alloc::collections::BTreeMap;
+use spin::Mutex;
+lazy_static! {
+    pub static ref SLEEP_TASKS: Mutex<BTreeMap<u64, SleepEntry>> = Mutex::new(BTreeMap::new());
+}
+use alloc::vec;
+pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
+    {
+        let mut tasks = SLEEP_TASKS.lock();
+        // Collect finished tasks so we can remove them outside the iteration
+        let mut finished = vec![];
+        for (task_id, entry) in tasks.iter_mut() {
+            if entry.remaining > 0 {
+                entry.remaining -= 1;
+                if entry.remaining == 0 {
+                    // Wake the task
+                    entry.waker.wake_by_ref();
+                    finished.push(*task_id);
+                }
+            }
+        }
+        // Remove finished tasks
+        for task_id in finished {
+            tasks.remove(&task_id);
+        }
+    }
+
+    LOCAL_APIC.set_eoi();
+}
 pub static HPET_SLEEP_COUNTER: AtomicI64 = AtomicI64::new(0);
 pub static HPET_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
 pub extern "x86-interrupt" fn hpet_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // serial_println!("HPET: {}", HPET_SLEEP_COUNTER.load(Ordering::Relaxed));
+    // panic!("FIX like lapic timer");
     if HPET_SLEEP_FLAG.load(Ordering::Relaxed) {
         HPET_SLEEP_COUNTER.fetch_add(
             HPET_SLEEP_COUNTER.load(Ordering::Relaxed) + 1,

@@ -1,5 +1,5 @@
 use crate::drivers::fonts::ansii_parser::ansii_builder::AnsiiString;
-use crate::shell::{colors, Command, SHELL};
+use crate::shell::{colors, Command, Shell};
 use alloc::vec::Vec;
 
 use crate::alloc::string::ToString;
@@ -8,11 +8,11 @@ use crate::println;
 pub struct HelpCommand;
 
 impl Command for HelpCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         const NAME_WIDTH: usize = 6;
         if args.is_empty() {
             println!("Available commands:");
-            for cmd in SHELL.commands.values() {
+            for cmd in shell.get_commands().values() {
                 println!(
                     "{}{} {}",
                     cmd.name().to_string().fg(colors::CYAN) + ":",
@@ -23,7 +23,7 @@ impl Command for HelpCommand {
             println!("\nUse 'help <command>' to see more details about a specific command.");
         } else {
             for arg in args {
-                if let Some(cmd) = SHELL.commands.get(arg) {
+                if let Some(cmd) = shell.get_commands().get(arg) {
                     println!(
                         "{}{} {}",
                         cmd.name().to_string().fg(colors::CYAN) + ":",

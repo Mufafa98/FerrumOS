@@ -1,10 +1,10 @@
-use crate::shell::Command;
+use crate::shell::{Command, Shell};
 use crate::{print, println};
 use alloc::vec::Vec;
 pub struct ClearCommand;
 
 impl Command for ClearCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         // Clear the terminal screen
         print!("\x1B[2J\x1B[1;1H");
     }

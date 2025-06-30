@@ -1,9 +1,9 @@
-use crate::shell::Command;
+use crate::shell::{Command, Shell};
 use crate::{print, println};
 use alloc::vec::Vec;
 pub struct LsCommand;
 impl Command for LsCommand {
-    fn execute(&self, args: Vec<&str>) {
+    fn execute(&self, args: Vec<&str>, shell: &Shell) {
         use crate::fs::ext2::FileData;
         if args.is_empty() {
             println!("Usage: ls <directory>");
