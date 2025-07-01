@@ -39,7 +39,7 @@ fn lapic_calibrate_ticks() -> u32 {
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
     LAPICTimer::set_ticks(ticks);
     LAPICTimer::set_active(false);
-    return ticks / 10000; // Return ticks per ms
+    return ticks / 1000; // Return ticks per 10 ms
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -114,8 +114,8 @@ impl LAPICTimer {
         LAPICTimer::set_active(false);
     }
     pub fn start_periodic_timer() {
-        use crate::interrupts::handlers::{LAPIC_TIMER_SLEEP_COUNTER, LAPIC_TIMER_SLEEP_FLAG};
-        use core::sync::atomic::Ordering;
+        // use crate::interrupts::handlers::{LAPIC_TIMER_SLEEP_COUNTER, LAPIC_TIMER_SLEEP_FLAG};
+        // use core::sync::atomic::Ordering;
 
         // LAPIC_TIMER_SLEEP_COUNTER.store(0, Ordering::Relaxed);
         // LAPIC_TIMER_SLEEP_FLAG.store(true, Ordering::Relaxed);

@@ -20,12 +20,15 @@ unsafe extern "C" fn _start() -> ! {
     ferrum_os::init();
     welcome();
     shell::print_caret();
-
+    crate::timer::lapic::LAPICTimer::start_periodic_timer();
     {
         use crate::task::GLOBAL_EXECUTOR;
         let mut executor = GLOBAL_EXECUTOR.lock();
+        serial_println!("Executor initialized");
         executor.spawn(Task::new(keyboard::print_keypresses()));
+        serial_println!("Keyboard task started");
     }
+    serial_println!("FerrumOs is running");
     executor::run_executor();
 }
 

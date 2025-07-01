@@ -12,13 +12,17 @@ use alloc::string::{String, ToString};
 
 pub mod commands;
 pub mod input_dispatcher;
+pub mod manual_builder;
 use commands::*;
 
 trait Command: Send + Sync {
+    fn new() -> Self
+    where
+        Self: Sized;
     fn execute(&self, args: Vec<&str>, shell: &Shell);
-    fn description(&self) -> &str;
+    fn description(&self) -> String;
     fn name(&self) -> &str;
-    fn manual(&self) -> &str;
+    fn manual(&self) -> String;
 }
 
 macro_rules! add_commands {
@@ -26,7 +30,7 @@ macro_rules! add_commands {
         $(
             $commands.insert(
                 stringify!($module).to_string(),
-                Box::new($module::$struct) as Box<dyn Command>,
+                Box::new($module::$struct::new()) as Box<dyn Command>,
             );
         )*
     };
@@ -76,7 +80,7 @@ impl Shell {
                 }
             }
             _ => {
-                println!("Unsupported key: {:?}", key);
+                // println!("Unsupported key: {:?}", key);
             }
         }
     }

@@ -1,13 +1,36 @@
 use crate::drivers::fonts::ansii_parser::ansii_builder::AnsiiString;
+use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{colors, Command, Shell};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::alloc::string::ToString;
 use crate::println;
 
-pub struct HelpCommand;
+pub struct HelpCommand {
+    manual: ManualBuilder,
+}
 
 impl Command for HelpCommand {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        HelpCommand {
+            manual: ManualBuilder::new()
+                .name("help")
+                .short_description("Show available commands and their descriptions")
+                .long_description(
+                    "Displays a list of all available commands in the shell. \
+                                   If a command is specified, it shows its manual.",
+                )
+                .usage("help [command [...]]")
+                .arg("[command]", "The command(s) to show the manual for.")
+                .example("help", "Show all available commands")
+                .example("help ls", "Show the manual for the 'ls' command"),
+        }
+    }
+
     fn execute(&self, args: Vec<&str>, shell: &Shell) {
         const NAME_WIDTH: usize = 6;
         if args.is_empty() {
@@ -24,12 +47,12 @@ impl Command for HelpCommand {
         } else {
             for arg in args {
                 if let Some(cmd) = shell.get_commands().get(arg) {
-                    println!(
-                        "{}{} {}",
-                        cmd.name().to_string().fg(colors::CYAN) + ":",
-                        " ".repeat(NAME_WIDTH - cmd.name().len()),
-                        cmd.description()
-                    );
+                    // println!(
+                    //     "{}{} {}",
+                    //     cmd.name().to_string().fg(colors::CYAN) + ":",
+                    //     " ".repeat(NAME_WIDTH - cmd.name().len()),
+                    //     cmd.description()
+                    // );
                     println!("{}", cmd.manual());
                 } else {
                     println!("Command not found: {}", arg);
@@ -38,19 +61,15 @@ impl Command for HelpCommand {
         }
     }
 
-    fn description(&self) -> &str {
-        "Show available commands and their descriptions"
+    fn description(&self) -> String {
+        self.manual.build_short()
     }
 
     fn name(&self) -> &str {
         "help"
     }
 
-    fn manual(&self) -> &str {
-        "Usage: help [command]\n\n\
-         Lists all available commands.\n\
-         If a command is specified, shows its manual.\n\n\
-         Example: help clear\n\n\
-         This will display the manual for the 'clear' command."
+    fn manual(&self) -> String {
+        self.manual.build_long()
     }
 }

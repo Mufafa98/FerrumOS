@@ -28,6 +28,8 @@ impl Future for Sleep {
             return Poll::Ready(());
         }
         // If not registered yet, store ourselves in SLEEP_TASKS with the waker
+        // disable intrerrupts
+        x86_64::instructions::interrupts::disable();
         if !self.registered {
             let mut tasks = SLEEP_TASKS.lock();
             tasks.insert(
@@ -38,15 +40,39 @@ impl Future for Sleep {
                 },
             );
             self.registered = true;
+        } else {
+            // Already registered; update self.remaining from the global map
+            let mut tasks = SLEEP_TASKS.lock();
+            if let Some(entry) = tasks.get_mut(&self.task_id.as_u64()) {
+                // Read the new remaining (decremented by the timer interrupt)
+                self.remaining = entry.remaining;
+                // Update the waker in case it’s changed
+                entry.waker = cx.waker().clone();
+
+                // If the interrupt decremented us to zero, remove and return Ready
+                if entry.remaining == 0 {
+                    tasks.remove(&self.task_id.as_u64());
+
+                    x86_64::instructions::interrupts::enable();
+                    return Poll::Ready(());
+                }
+            } else {
+                serial_println!(
+                    "Sleep task with ID {} not found in SLEEP_TASKS",
+                    self.task_id.as_u64()
+                );
+
+                x86_64::instructions::interrupts::enable();
+                return Poll::Ready(());
+            }
         }
+        x86_64::instructions::interrupts::enable();
         Poll::Pending
     }
 }
 
 /// Create a new Sleep future for the given duration, associated with a task ID.
 pub fn sleep(duration: u64, task_id: TaskId) -> Sleep {
-    todo!("FINISH ME");
-    crate::timer::lapic::LAPICTimer::start_periodic_timer();
     Sleep {
         remaining: duration,
         task_id,
