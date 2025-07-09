@@ -1,7 +1,7 @@
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::Command;
 use crate::task::REM_TASK_Q;
-use crate::{println, serial_println};
+use crate::{print, println, serial_println};
 use alloc::string::{String, ToString};
 
 pub struct KillCommand {

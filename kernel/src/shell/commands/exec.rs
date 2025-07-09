@@ -2,7 +2,7 @@ use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
 use crate::task::executor::{self, Executor};
 use crate::task::Task;
-use crate::{println, serial_print, serial_println, task};
+use crate::{print, println, serial_print, serial_println, task};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 

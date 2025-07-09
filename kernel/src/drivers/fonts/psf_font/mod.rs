@@ -1,6 +1,7 @@
 //! This module contains the implementation of the PsfFont struct,
 //! which is used to represent a font in the PSF format.
 use super::super::framebuffer::FrameBuffer;
+use alloc::vec::Vec;
 use glyph::Glyphs;
 mod glyph;
 /// PsfFont struct containing the font data
@@ -211,5 +212,12 @@ impl PsfFont {
             }
         }
         None
+    }
+    pub fn get_glyphs_unicodes(&self) -> Vec<u32> {
+        let mut unicodes = Vec::new();
+        for i in 0..self.numglyph {
+            unicodes.push(self.glyphs.get_unicode(i as usize));
+        }
+        unicodes
     }
 }

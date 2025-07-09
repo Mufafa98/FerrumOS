@@ -1,5 +1,6 @@
 pub mod cat;
 pub mod clear;
+pub mod cp437;
 pub mod echo;
 pub mod exec;
 pub mod help;

@@ -44,18 +44,20 @@ impl Shell {
     pub fn new() -> Self {
         let mut commands = BTreeMap::new();
         add_commands!(commands,
-            clear => ClearCommand,
-            help => HelpCommand,
-            echo => EchoCommand,
-            cat => CatCommand,
-            ls => LsCommand,
-            mkdir => MkdirCommand,
-            rm => RmCommand,
-            touch => TouchCommand,
-            write => WriteCommand,
-            exec => ExecCommand,
-            kill => KillCommand,
-            ps => PsCommand,
+            help => HelpCommand,        // HELP
+            clear => ClearCommand,      // SCRN
+            echo => EchoCommand,        // SCRN
+            cat => CatCommand,          // FLST
+            ls => LsCommand,            // FLST
+            mkdir => MkdirCommand,      // FLST
+            rm => RmCommand,            // FLST
+            touch => TouchCommand,      // FLST
+            write => WriteCommand,      // FLST
+            exec => ExecCommand,        // ASAW
+            kill => KillCommand,        // ASAW
+            ps => PsCommand,            // ASAW
+            // TODO: Add command
+            // cp437 => CP437Command,
         );
         Shell {
             commands,

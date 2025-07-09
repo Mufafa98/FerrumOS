@@ -212,6 +212,20 @@ impl TdfTextWriter {
             }
         }
     }
+
+    pub fn prin_available_chars(&mut self) {
+        use alloc::string::String;
+        let mut output = String::new();
+        let unicodes = self.font.get_glyphs_unicodes();
+        for unicode in unicodes {
+            if let Some(character) = core::char::from_u32(unicode) {
+                output.push(character);
+            } else {
+                output.push('?'); // Use '?' for invalid unicode characters
+            }
+        }
+        self.write_string(&output);
+    }
 }
 
 impl fmt::Write for TdfTextWriter {
