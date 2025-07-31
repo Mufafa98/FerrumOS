@@ -2,10 +2,9 @@
 #![no_main]
 
 use alloc::string::{String, ToString};
-use ferrum_os::*;
-
-use io::serial;
+use ferrum_os::{drivers::fonts::ansii_parser::ansii_builder::AnsiiString, task::demo_task, *};
 use task::{executor, keyboard, Task};
+use timer::Time;
 
 extern crate alloc;
 
@@ -20,20 +19,19 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
 unsafe extern "C" fn _start() -> ! {
     ferrum_os::init();
     welcome();
-    use timer::lapic::*;
-    use timer::pit::PIT;
-    lapic_calibrate();
-    serial_println!("start");
-    let start = PIT::get_counter();
-    LAPICTimer::sleep(100);
-    // timer::pit::PIT::sleep(1000);
-    let end = PIT::get_counter();
-    serial_println!("end");
-    serial_println!("Ticks: {}", end - start);
-    let mut executor = executor::Executor::new();
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
+    shell::print_caret();
+    crate::timer::lapic::LAPICTimer::start_periodic_timer();
+    {
+        use crate::task::GLOBAL_EXECUTOR;
+        let mut executor = GLOBAL_EXECUTOR.lock();
+        serial_println!("Executor initialized");
+        executor.spawn(Task::new(keyboard::print_keypresses()));
+        serial_println!("Keyboard task started");
+    }
+    serial_println!("FerrumOs is running");
+    executor::run_executor();
 }
+
 fn calibrate() {
     use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
     use interrupts::InterruptIndexAPIC;
@@ -69,16 +67,20 @@ fn welcome() {
         features,
         separator = "-".repeat(title.len())
     );
-    println!("Welcome to FerrumOs");
+    println!("{}", "Welcome to FerrumOs");
 }
-fn timer() {
-    use timer::pit::{pit_config::*, PIT};
-    let mut timer = PIT::new();
-    timer.set_mode(PITOperatingMode::RateGenerator);
-    timer.set_timer(100);
-    timer.start();
+fn _test_timer_old() {
+    use timer::lapic::*;
+    use timer::pit::PIT;
+    lapic_calibrate();
+    serial_println!("start");
+    let start = PIT::get_counter();
+    LAPICTimer::sleep(100);
+    // timer::pit::PIT::sleep(1000);
+    let end = PIT::get_counter();
+    serial_println!("end");
+    serial_println!("Ticks: {}", end - start);
 }
-
 fn _i64_to_str(i: i64) -> String {
     let mut string = String::new();
     string.push((i & 0xff) as u8 as char);
@@ -98,8 +100,6 @@ async fn _async_world() {
         println!("World from async_world");
     }
 }
-
-use core::{char, pin::Pin, time};
 
 fn _heap_test_debug() {
     use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
@@ -131,4 +131,23 @@ fn _heap_test_debug() {
 fn _inf_rec() {
     _inf_rec();
     x86_64::instructions::hlt();
+}
+
+fn hpet() {
+    // use drivers::acpi::{
+    //     hpet::{HPETRegisters, HPET},
+    //     rsdp::Rsdp,
+    //     rsdt::RSDT,
+    // };
+    // let rsdp = Rsdp::new();
+    // let rsdt_table = RSDT::new(rsdp.rsdt_address());
+    // let hpet = rsdt_table.get_hpet().unwrap();
+    // let test_time = 100_000_000;
+    // hpet.set_timer_n_comparator(2, test_time);
+    // hpet.get_timer_n_config(2).set_interrupt_idx(0x12);
+    // hpet.get_timer_n_config(2).enable_interrupt();
+    // hpet.enable();
+    use crate::timer::hpet::HPETTimer;
+    let timer = HPETTimer::new();
+    timer.sleep(Time::Nanoseconds(10000));
 }

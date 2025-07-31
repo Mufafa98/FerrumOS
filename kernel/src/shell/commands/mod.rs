@@ -1,0 +1,13 @@
+pub mod cat;
+pub mod clear;
+pub mod cp437;
+pub mod echo;
+pub mod exec;
+pub mod help;
+pub mod kill;
+pub mod ls;
+pub mod mkdir;
+pub mod ps;
+pub mod rm;
+pub mod touch;
+pub mod write;

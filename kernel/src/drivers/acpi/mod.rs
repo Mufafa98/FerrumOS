@@ -1,8 +1,10 @@
+pub mod hpet;
 mod madt;
 pub mod rsdp;
 pub mod rsdt;
 
 #[repr(C)]
+#[derive(Debug)]
 struct ACPISDTHeader {
     signature: [u8; 4],
     length: u32,

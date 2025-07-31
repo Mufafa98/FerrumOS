@@ -2,8 +2,8 @@ pub mod pit_config;
 use pit_config::*;
 
 use crate::{
-    print, serial_print, serial_println,
-    timer::pit,
+    // print, serial_print, serial_println,
+    // timer::pit,
     utils::registers::{inb, outb},
 };
 const BASE_FREQUENCY: f32 = 3579545.0 / 3.0;

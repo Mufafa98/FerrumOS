@@ -8,7 +8,6 @@ use core::fmt;
 use volatile::*;
 
 mod colors;
-mod tests;
 
 // lazy_static! {
 //     /// A mutex protected static used for writing to the screen.

@@ -58,6 +58,8 @@ impl IOAPICStruct {
     }
 }
 use lazy_static::lazy_static;
+
+use crate::ok;
 lazy_static! {
     static ref IO_APIC: IOAPICStruct = {
         let ioapic = {
@@ -75,4 +77,10 @@ pub fn init() {
     use crate::interrupts::InterruptIndexAPIC;
     IO_APIC.set_red_tbl_vec(2, InterruptIndexAPIC::Timer as u8);
     IO_APIC.set_red_tbl_vec(1, InterruptIndexAPIC::Keyboard as u8);
+    IO_APIC.set_red_tbl_vec(0x12, InterruptIndexAPIC::HPET as u8);
+    //TEST ATA
+    IO_APIC.set_red_tbl_vec(0x14, InterruptIndexAPIC::AtaMaster as u8);
+    IO_APIC.set_red_tbl_vec(0x15, InterruptIndexAPIC::AtaSlave as u8);
+    //TEST ATA
+    ok!("IOAPIC initialized")
 }

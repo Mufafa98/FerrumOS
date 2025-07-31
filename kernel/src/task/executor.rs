@@ -1,4 +1,6 @@
 //! Task executor module
+use crate::{io::serial, serial_println};
+
 use super::{Task, TaskId};
 use alloc::{collections::BTreeMap, sync::Arc, task::Wake};
 use core::task::{Context, Poll, Waker};
@@ -23,6 +25,7 @@ impl Executor {
     pub fn spawn(&mut self, task: Task) {
         // Set the task ID
         let task_id = task.id;
+        super::RUNNING_TASKS.lock().push(task_id);
         // If the task ID already exists, panic
         // because if the task ID already exists, it means
         // that there is a bug in our program
@@ -70,6 +73,8 @@ impl Executor {
                 Poll::Ready(()) => {
                     tasks.remove(&task_id);
                     waker_cache.remove(&task_id);
+                    let mut running_tasks = super::RUNNING_TASKS.lock();
+                    running_tasks.retain(|&id| id != task_id);
                 }
                 Poll::Pending => {}
             }
@@ -100,6 +105,37 @@ impl Executor {
         }
     }
 }
+
+pub fn run_executor() -> ! {
+    loop {
+        // Get a mutable reference to the global executor
+        let mut executor = super::GLOBAL_EXECUTOR.lock();
+        // Run the executor
+        executor.run_ready_tasks();
+        executor.sleep_if_idle();
+
+        let mut task_remove_queue = super::REM_TASK_Q.lock();
+        while let Some(task_id) = task_remove_queue.pop() {
+            let task_id = TaskId::from(task_id);
+            if executor.tasks.remove(&task_id).is_none() {
+                serial_println!("WARNING: task with ID {:?} not found in executor", task_id);
+            }
+            executor.waker_cache.remove(&task_id);
+            let mut running_tasks = super::RUNNING_TASKS.lock();
+            running_tasks.retain(|&id| id != task_id);
+            serial_println!("Removed task with ID {:?}", task_id);
+        }
+
+        let mut task_add_queue = super::ADD_TASK_Q.lock();
+        while let Some(task) = task_add_queue.pop() {
+            executor.spawn(task);
+        }
+    }
+}
+
+unsafe impl Send for Executor {}
+unsafe impl Sync for Executor {}
+
 /// Task waker that can wake up tasks
 struct TaskWaker {
     task_id: TaskId,

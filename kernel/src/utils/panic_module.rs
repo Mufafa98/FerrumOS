@@ -16,13 +16,13 @@ pub fn panic(info: &PanicInfo) -> ! {
     crate::hlt_loop();
 }
 
-// our panic handler in test mode
-#[cfg(test)]
-#[panic_handler]
-/// Panic function implementation
-pub fn panic(info: &PanicInfo) -> ! {
-    serial_println!("[failed]\n");
-    serial_println!("Error: {}\n", info);
-    exit_qemu(QemuExitCode::Failed);
-    crate::hlt_loop();
-}
+// // our panic handler in test mode
+// #[cfg(test)]
+// #[panic_handler]
+// /// Panic function implementation
+// pub fn panic(info: &PanicInfo) -> ! {
+//     serial_println!("[failed]\n");
+//     serial_println!("Error: {}\n", info);
+//     exit_qemu(QemuExitCode::Failed);
+//     crate::hlt_loop();
+// }

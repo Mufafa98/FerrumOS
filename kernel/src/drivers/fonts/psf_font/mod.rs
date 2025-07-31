@@ -1,6 +1,7 @@
 //! This module contains the implementation of the PsfFont struct,
 //! which is used to represent a font in the PSF format.
 use super::super::framebuffer::FrameBuffer;
+use alloc::vec::Vec;
 use glyph::Glyphs;
 mod glyph;
 /// PsfFont struct containing the font data
@@ -16,6 +17,8 @@ pub struct PsfFont {
     height: u32,
     width: u32,
     glyphs: Glyphs,
+    padding_before: u64,
+    padding_after: u64,
 }
 
 impl PsfFont {
@@ -42,6 +45,8 @@ impl PsfFont {
             height,
             width,
             glyphs,
+            padding_before: 0, // Default padding before
+            padding_after: 0,  // Default padding after
         };
 
         result
@@ -52,7 +57,13 @@ impl PsfFont {
     }
     /// Gets the width of the font
     pub fn get_width(&self) -> u32 {
-        self.width
+        self.width + self.padding_before as u32 + self.padding_after as u32
+    }
+    pub fn set_padding_before(&mut self, padding: u64) {
+        self.padding_before = padding;
+    }
+    pub fn set_padding_after(&mut self, padding: u64) {
+        self.padding_after = padding;
     }
     /// Displays a character on the framebuffer at the given position with the given colors
     pub fn display_char(
@@ -65,14 +76,38 @@ impl PsfFont {
         font_size_multiplier: u64,
     ) {
         let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
-        for row in 0..16_u64 {
-            for col in 0..8_u64 {
-                let bit = glyph[row as usize] & (1 << (7 - col));
+
+        let font_height = self.get_height() as u64;
+        let font_width =
+            self.get_width() as u64 - self.padding_before as u64 - self.padding_after as u64;
+
+        let padding_before = self.padding_before as u64;
+        let padding_after = self.padding_after as u64;
+
+        for row in 0..font_height {
+            let total_cell_width = font_width + padding_before + padding_after;
+            for col in 0..total_cell_width {
+                let color;
+
+                if col >= padding_before && col < padding_before + font_width {
+                    let glyph_col = col - padding_before;
+                    let bit = glyph[row as usize] & (1 << (font_width - 1 - glyph_col));
+                    color = {
+                        if bit != 0 {
+                            fg_color
+                        } else {
+                            bg_color
+                        }
+                    };
+                } else {
+                    color = bg_color;
+                }
+
                 let pixel_coord = (
                     position.0 + col * font_size_multiplier,
                     position.1 + row * font_size_multiplier,
                 );
-                let color = if bit != 0 { fg_color } else { bg_color };
+                // let color = if bit != 0 { fg_color } else { bg_color };
                 framebuffer.put_pixel_on_square(
                     pixel_coord.0,
                     pixel_coord.1,
@@ -82,6 +117,85 @@ impl PsfFont {
             }
         }
     }
+
+    pub fn display_bold_char(
+        &self,
+        character: char,
+        framebuffer: &FrameBuffer,
+        position: (u64, u64),
+        fg_color: u32,
+        bg_color: u32,
+        font_size_multiplier: u64,
+    ) {
+        const BOLD_OFFSET: u64 = 1;
+
+        let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
+
+        let font_height = self.get_height() as u64;
+        let font_width = self.width as u64;
+
+        let effective_char_width = font_width + BOLD_OFFSET;
+
+        // Draw background first
+
+        for row in 0..font_height {
+            for col in 0..effective_char_width {
+                let pixel_coord = (
+                    position.0 + col * font_size_multiplier,
+                    position.1 + row * font_size_multiplier,
+                );
+                framebuffer.put_pixel_on_square(
+                    pixel_coord.0,
+                    pixel_coord.1,
+                    bg_color,
+                    font_size_multiplier,
+                );
+            }
+        }
+
+        // draw character
+
+        for row in 0..font_height {
+            for col in 0..font_width {
+                let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
+                if bit != 0 {
+                    let pixel_coord = (
+                        position.0 + col * font_size_multiplier,
+                        position.1 + row * font_size_multiplier,
+                    );
+                    framebuffer.put_pixel_on_square(
+                        pixel_coord.0,
+                        pixel_coord.1,
+                        fg_color,
+                        font_size_multiplier,
+                    );
+                }
+            }
+        }
+
+        // draw bold effect
+
+        for row in 0..font_height {
+            for col in 0..font_width {
+                let bit = glyph[row as usize] & (1 << (font_width - 1 - col));
+                if bit != 0 {
+                    let offset_col = col + BOLD_OFFSET;
+
+                    let pixel_coord = (
+                        position.0 + offset_col * font_size_multiplier,
+                        position.1 + row * font_size_multiplier,
+                    );
+                    framebuffer.put_pixel_on_square(
+                        pixel_coord.0,
+                        pixel_coord.1,
+                        fg_color,
+                        font_size_multiplier,
+                    );
+                }
+            }
+        }
+    }
+
     /// Gets the glyph data for the given index
     fn get_glyph(&self, index: u32) -> [u8; 16] {
         let mut glyph = [0; 16];
@@ -98,5 +212,12 @@ impl PsfFont {
             }
         }
         None
+    }
+    pub fn get_glyphs_unicodes(&self) -> Vec<u32> {
+        let mut unicodes = Vec::new();
+        for i in 0..self.numglyph {
+            unicodes.push(self.glyphs.get_unicode(i as usize));
+        }
+        unicodes
     }
 }

@@ -1,4 +1,5 @@
 use core::arch::asm;
+//read
 pub fn inb(port: u16) -> u8 {
     let data: u8;
     unsafe {
@@ -10,6 +11,7 @@ pub fn inb(port: u16) -> u8 {
     }
     data
 }
+//write
 pub fn outb(port: u16, data: u8) {
     unsafe {
         asm!(

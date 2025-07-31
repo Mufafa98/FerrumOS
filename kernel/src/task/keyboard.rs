@@ -1,5 +1,6 @@
 //! Keyboard task module
-use crate::{print, println};
+use crate::{ok, print, println};
+use alloc::string::String;
 use conquer_once::spin::OnceCell;
 use core::{
     pin::Pin,
@@ -10,7 +11,10 @@ use futures_util::{
     stream::{Stream, StreamExt},
     task::AtomicWaker,
 };
+use lazy_static::lazy_static;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
+
 /// The scancode queue for keyboard input
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
 /// Add a scancode to the scancode queue
@@ -74,6 +78,7 @@ impl Stream for ScancodeStream {
 }
 /// The waker for the keyboard task
 static WAKER: AtomicWaker = AtomicWaker::new();
+
 /// Print keypresses
 pub async fn print_keypresses() {
     // Create a new scancode stream
@@ -90,11 +95,9 @@ pub async fn print_keypresses() {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             // If the scancode was added, try to get the key
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                // If the key was found, print it
-                match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
-                }
+                crate::shell::input_dispatcher::INPUT_DISPATCHER
+                    .lock()
+                    .dispatch_key(key);
             }
         }
     }
