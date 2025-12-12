@@ -5,6 +5,7 @@ use crate::{
 
 use alloc::{collections::btree_map::BTreeMap, vec::Vec};
 use lazy_static::lazy_static;
+use pc_keyboard::DecodedKey;
 use spin::Mutex;
 
 use alloc::boxed::Box;
@@ -38,6 +39,7 @@ macro_rules! add_commands {
 
 pub struct Shell {
     commands: BTreeMap<String, Box<dyn Command>>,
+    history: Vec<String>, // Command history
     key_buffer: String,
 }
 impl Shell {
@@ -62,6 +64,7 @@ impl Shell {
         Shell {
             commands,
             key_buffer: String::new(),
+            history: Vec::new(),
         }
     }
 
@@ -73,6 +76,7 @@ impl Shell {
                     self.execute_command(&self.key_buffer);
                     self.key_buffer.clear();
                     print_caret();
+                    self.history.push(self.key_buffer.clone());
                 } else if c == '\x08' || c == '\x7f' {
                     self.key_buffer.pop();
                     print!("\x08 \x08");
@@ -82,7 +86,14 @@ impl Shell {
                 }
             }
             _ => {
-                // println!("Unsupported key: {:?}", key);
+                println!("Unsupported key: {:?}", key);
+                if key == pc_keyboard::DecodedKey::FunctionKey(pc_keyboard::FunctionKey::ArrowUp) {
+                    // Show help
+                    let help = HelpCommand::new();
+                    println!("{}", help.manual());
+                } else {
+                    println!("Unsupported key: {:?}", key);
+                }
             }
         }
     }

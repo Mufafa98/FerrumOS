@@ -23,9 +23,12 @@ logs/
 
 # Added by cargo
 /target
-
+.gdbinit
+.gdbhistory
 **/*.iso
 **/*.img
 **/*.sh
 **/*.log
+**/*.py
 /old
+/Licienta
