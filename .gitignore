@@ -29,3 +29,5 @@ logs/
 **/*.sh
 **/*.log
 /old
+/limine
+/iso_root
