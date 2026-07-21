@@ -91,6 +91,7 @@ impl BlockGroupDescriptorTable {
     pub fn get_block_group_descriptor_as_mut(&mut self, index: usize) -> &mut BlockGroupDescriptor {
         &mut self.block_group_descriptors[index]
     }
+    #[allow(unused)]
     pub fn inc_dir_count_block_address(&mut self, block_address: usize, block_size: usize) {
         let bgd_index = block_address / block_size;
         if bgd_index >= self.block_group_descriptors.len() {
@@ -132,7 +133,6 @@ impl BlockGroupDescriptorTable {
         bytes
     }
     pub fn flush(&self) {
-        use crate::serial_println;
         //TODO Remove?
         unsafe {
             use crate::drivers::ata;

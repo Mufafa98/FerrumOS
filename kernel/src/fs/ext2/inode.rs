@@ -18,6 +18,7 @@ pub enum InodeType {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub enum InodeFlags {
     SecureDeletion = 0x1,
     KeepCopyWhenDeleted = 0x2,
@@ -632,6 +633,7 @@ impl Inode {
         return None;
     }
 
+    #[allow(unused)]
     fn list_blocks(&self) {
         use super::read_1kb_block;
         for i in 0..12 {
@@ -836,10 +838,12 @@ impl Inode {
         }
     }
 
+    #[allow(unused)]
     pub fn get_permissions(&self) -> u16 {
         return self.base.mode & 0x0FFF;
     }
 
+    #[allow(unused)]
     pub fn has_flag(&self, flag: InodeFlags) -> bool {
         serial_println!("Flag: {:?}", self);
         return (self.base.flags & flag as u32) != 0;
@@ -881,6 +885,7 @@ impl Inode {
         self.base.disk_sectors_count = count;
     }
 
+    #[allow(unused)]
     pub fn get_block_count(&self) -> u32 {
         return self.base.disk_sectors_count;
     }
@@ -914,7 +919,7 @@ impl Inode {
                     return;
                 }
                 let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-                let mut data = read_1kb_block(block, block_size);
+                let data = read_1kb_block(block, block_size);
 
                 for i in 0..256 {
                     let block_number = u32::from_le_bytes([
@@ -934,7 +939,7 @@ impl Inode {
                     return;
                 }
                 let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-                let mut data = read_1kb_block(block, block_size);
+                let data = read_1kb_block(block, block_size);
 
                 for i in 0..256 {
                     let block_number = u32::from_le_bytes([
@@ -954,7 +959,7 @@ impl Inode {
                     return;
                 }
                 let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-                let mut data = read_1kb_block(block, block_size);
+                let data = read_1kb_block(block, block_size);
 
                 for i in 0..256 {
                     let block_number = u32::from_le_bytes([

@@ -1,10 +1,12 @@
 #[derive(Debug)]
 #[repr(u16)]
+#[allow(unused)]
 pub enum State {
     Valid,
     Error,
 }
 impl State {
+    #[allow(unused)]
     pub fn from_u16(value: u16) -> Self {
         match value {
             1 => State::Valid,
@@ -16,12 +18,14 @@ impl State {
 
 #[derive(Debug)]
 #[repr(u16)]
+#[allow(unused)]
 pub enum Error {
     Ignore,
     RemountReadOnly,
     Panic,
 }
 impl Error {
+    #[allow(unused)]
     pub fn from_u16(value: u16) -> Self {
         match value {
             1 => Error::Ignore,
@@ -34,6 +38,7 @@ impl Error {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[allow(unused)]
 pub enum CreatorOS {
     Linux,
     Hurd,
@@ -42,6 +47,7 @@ pub enum CreatorOS {
     Lites,
 }
 impl CreatorOS {
+    #[allow(unused)]
     pub fn from_u32(value: u32) -> Self {
         match value {
             0 => CreatorOS::Linux,
@@ -56,6 +62,7 @@ impl CreatorOS {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[allow(unused)]
 pub enum OptionalFeatures {
     DirectoryPrealloc,
     IMagicInodes,
@@ -65,6 +72,7 @@ pub enum OptionalFeatures {
     DirectoryIndex,
 }
 impl OptionalFeatures {
+    #[allow(unused)]
     pub fn from_u32(value: u32) -> Self {
         match value {
             0x1 => OptionalFeatures::DirectoryPrealloc,
@@ -80,6 +88,7 @@ impl OptionalFeatures {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[allow(unused)]
 pub enum RequiredFeatures {
     Compression,
     FileType,
@@ -88,6 +97,7 @@ pub enum RequiredFeatures {
     MetaBg,
 }
 impl RequiredFeatures {
+    #[allow(unused)]
     pub fn from_u32(value: u32) -> Self {
         match value {
             0x1 => RequiredFeatures::Compression,
@@ -102,12 +112,14 @@ impl RequiredFeatures {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[allow(unused)]
 pub enum ReadOnlyFeatures {
     SparseSuper,
     LargeFile,
     BTreeDir,
 }
 impl ReadOnlyFeatures {
+    #[allow(unused)]
     pub fn from_u32(value: u32) -> Self {
         match value {
             0x1 => ReadOnlyFeatures::SparseSuper,
@@ -119,17 +131,22 @@ impl ReadOnlyFeatures {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Feature(u32);
 impl Feature {
+    #[allow(unused)]
     pub fn new(value: u32) -> Self {
         Feature(value)
     }
+    #[allow(unused)]
     pub fn has_optional_feature(&self, feature: OptionalFeatures) -> bool {
         self.0 & feature as u32 != 0
     }
+    #[allow(unused)]
     pub fn has_required_feature(&self, feature: RequiredFeatures) -> bool {
         self.0 & feature as u32 != 0
     }
+    #[allow(unused)]
     pub fn has_read_only_feature(&self, feature: ReadOnlyFeatures) -> bool {
         self.0 & feature as u32 != 0
     }
@@ -137,6 +154,7 @@ impl Feature {
 
 #[derive(Debug)]
 #[repr(u32)]
+#[allow(unused)]
 pub enum CompressionAlg {
     NoComp,
     LZV1,
@@ -146,6 +164,7 @@ pub enum CompressionAlg {
     LZO,
 }
 impl CompressionAlg {
+    #[allow(unused)]
     pub fn from_u32(value: u32) -> Self {
         match value {
             0x0 => CompressionAlg::NoComp,

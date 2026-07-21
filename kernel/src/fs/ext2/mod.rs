@@ -2,8 +2,8 @@ use alloc::vec;
 use core::usize;
 
 use crate::fs::ext2::inode::build_inode;
-use crate::{drivers::*, ok, print, println};
-use crate::{serial_print, serial_println};
+// use crate::serial_println;
+use crate::{drivers::*, println};
 use spin::mutex::Mutex;
 
 use alloc::string::{String, ToString};
@@ -17,7 +17,6 @@ mod inode;
 mod superblock;
 
 use bgdt::BlockGroupDescriptorTable;
-use file::File;
 use inode::{Inode, InodeType};
 use superblock::Superblock;
 
@@ -27,27 +26,6 @@ lazy_static::lazy_static!(
     static ref BLOCK_GROUP_DESCRIPTOR_TABLE: Mutex<BlockGroupDescriptorTable> =
         Mutex::new(BlockGroupDescriptorTable::new());
 );
-
-fn print_hex(buffer: &[u8]) {
-    for i in 0..buffer.len() {
-        if i % 16 == 0 {
-            serial_println!();
-        }
-        serial_print!("{:02X} ", buffer[i]);
-    }
-}
-
-// pub fn buffer_to_string(buffer: &[u8]) -> String {
-//     let string = String::new();
-//     for i in 0..buffer.len() {
-//         if buffer[i] == 0 {
-//             continue;
-//         }
-//         // string.push(buffer[i] as char);
-//         serial_print!("{}", buffer[i] as char);
-//     }
-//     string
-// }
 
 pub fn read_1kb_block(block_number: u32, block_size: u32) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::new();
@@ -59,13 +37,13 @@ pub fn read_1kb_block(block_number: u32, block_size: u32) -> Vec<u8> {
     let buffer = &mut [0u8; 512];
     let read_result = ata::read(0, block_1, buffer);
     if read_result.is_err() {
-        serial_println!("Failed to read from disk. Error {:?}", read_result.err());
+        println!("Failed to read from disk. Error {:?}", read_result.err());
     }
     result.extend_from_slice(buffer);
 
     let read_result = ata::read(0, block_2, buffer);
     if read_result.is_err() {
-        serial_println!("Failed to read from disk. Error {:?}", read_result.err());
+        println!("Failed to read from disk. Error {:?}", read_result.err());
     }
     result.extend_from_slice(buffer);
     result
@@ -73,7 +51,7 @@ pub fn read_1kb_block(block_number: u32, block_size: u32) -> Vec<u8> {
 
 pub fn write_1kb_block(block_number: u32, block_size: u32, buffer: &[u8], size: usize) {
     if size != 1024 {
-        serial_println!("Buffer len should be 1024");
+        println!("Buffer len should be 1024");
         return;
     }
     let block_address = block_number * block_size;
@@ -85,14 +63,14 @@ pub fn write_1kb_block(block_number: u32, block_size: u32, buffer: &[u8], size: 
 
     let write_result = ata::write(0, block_1, &data_1);
     if write_result.is_err() {
-        serial_println!(
+        println!(
             "Failed to write first part of data on disk {:?}",
             write_result.err()
         );
     }
     let write_result = ata::write(0, block_2, &data_2);
     if write_result.is_err() {
-        serial_println!(
+        println!(
             "Failed to write second part of data on disk {:?}",
             write_result.err()
         );
@@ -228,7 +206,7 @@ impl DirEntry {
         };
 
         // Check if path already exists
-        if let Some(existing_entry) = find_by_path(trimmed_path) {
+        if let Some(_) = find_by_path(trimmed_path) {
             return Err(DirEntryError::EntryAlreadyExists);
         }
 
@@ -303,12 +281,6 @@ impl DirEntry {
                 .inc_dir_count(block_group_id as usize);
         }
 
-        let type_str = if new_inode_type == InodeType::Directory {
-            "Directory"
-        } else {
-            "File"
-        };
-
         Ok(entry_for_parent)
     }
 
@@ -365,7 +337,7 @@ impl DirEntry {
                 }
 
                 // 5. Remove the entry from the parent directory's data blocks.
-                entry_to_remove.remove_from_inode(&mut parent_inode);
+                entry_to_remove.remove_from_inode(&mut parent_inode)?;
 
                 // 6. Decrement link counts.
                 parent_inode.dec_hard_links_count(); // For '..'
@@ -450,7 +422,7 @@ impl DirEntry {
                     } else {
                         // Case 2: Removing a subsequent entry.
                         // Absorb its rec_len into the previous entry.
-                        let mut prev_entry = DirEntry::from_ptr(&data, prev_entry_offset);
+                        let prev_entry = DirEntry::from_ptr(&data, prev_entry_offset);
                         let new_rec_len = prev_entry.rec_len + removed_entry_rec_len;
 
                         // Write the new rec_len to the previous entry in the buffer.
@@ -479,7 +451,7 @@ impl DirEntry {
             entry_to_remove: &DirEntry,
             block_size: u32,
         ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
+            let data = read_1kb_block(block_addr, block_size);
 
             for i in 0..256 {
                 let block_number = u32::from_le_bytes([
@@ -502,7 +474,7 @@ impl DirEntry {
             entry_to_remove: &DirEntry,
             block_size: u32,
         ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
+            let data = read_1kb_block(block_addr, block_size);
 
             for i in 0..256 {
                 let block_number = u32::from_le_bytes([
@@ -525,7 +497,7 @@ impl DirEntry {
             entry_to_remove: &DirEntry,
             block_size: u32,
         ) -> Result<bool, DirEntryError> {
-            let mut data = read_1kb_block(block_addr, block_size);
+            let data = read_1kb_block(block_addr, block_size);
 
             for i in 0..256 {
                 let block_number = u32::from_le_bytes([
@@ -593,7 +565,7 @@ impl DirEntry {
             if remaining_space < new_entry.size() || block == 0 {
                 let new_block = inode.allocate_new_block();
                 if new_block == None {
-                    serial_println!("Failed to allocate new block for entry {}", new_entry.name);
+                    println!("Failed to allocate new block for entry {}", new_entry.name);
                     return;
                 }
                 let new_block = new_block.unwrap();
@@ -620,7 +592,7 @@ impl DirEntry {
 
         fn entry_on_i(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-            let mut data = read_1kb_block(block, block_size);
+            let data = read_1kb_block(block, block_size);
 
             for i in 0..255 {
                 let block_number = u32::from_le_bytes([
@@ -629,80 +601,62 @@ impl DirEntry {
                     data[i * 4 + 2],
                     data[i * 4 + 3],
                 ]);
-                let next_block = u32::from_le_bytes([
-                    data[(i * 4) + 4],
-                    data[(i * 4) + 5],
-                    data[(i * 4) + 6],
-                    data[(i * 4) + 7],
-                ]);
-                let block: u32;
-                if i == 255 {
-                    block = next_block;
-                    break;
-                } else if next_block == 0 {
-                    block = block_number;
-                    break;
+
+                // Skip empty entries
+                if block_number == 0 {
+                    continue;
                 }
+
+                // Try to add entry to this doubly-indirect block
+                entry_on_d(block_number, inode, new_entry);
+                return;
             }
-            entry_on_d(block, inode, new_entry);
         }
 
         fn entry_on_db(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-            let mut data = read_1kb_block(block, block_size);
+            let data = read_1kb_block(block, block_size);
 
-            for i in 0..255 {
+            for i in 0..256 {
                 let block_number = u32::from_le_bytes([
                     data[i * 4],
                     data[i * 4 + 1],
                     data[i * 4 + 2],
                     data[i * 4 + 3],
                 ]);
-                let next_block = u32::from_le_bytes([
-                    data[(i * 4) + 4],
-                    data[(i * 4) + 5],
-                    data[(i * 4) + 6],
-                    data[(i * 4) + 7],
-                ]);
-                let block: u32;
-                if i == 255 {
-                    block = next_block;
-                    break;
-                } else if next_block == 0 {
-                    block = block_number;
-                    break;
+
+                // Skip empty entries
+                if block_number == 0 {
+                    continue;
                 }
+
+                // Try to add entry to this doubly-indirect block
+                entry_on_db(block_number, inode, new_entry);
+                return;
             }
-            entry_on_i(block, inode, new_entry);
         }
 
         fn entry_on_t(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
-            let mut data = read_1kb_block(block, block_size);
+            let data = read_1kb_block(block, block_size);
 
-            for i in 0..255 {
+            for i in 0..256 {
                 let block_number = u32::from_le_bytes([
                     data[i * 4],
                     data[i * 4 + 1],
                     data[i * 4 + 2],
                     data[i * 4 + 3],
                 ]);
-                let next_block = u32::from_le_bytes([
-                    data[(i * 4) + 4],
-                    data[(i * 4) + 5],
-                    data[(i * 4) + 6],
-                    data[(i * 4) + 7],
-                ]);
-                let block: u32;
-                if i == 255 {
-                    block = next_block;
-                    break;
-                } else if next_block == 0 {
-                    block = block_number;
-                    break;
+
+                // Skip empty entries
+                if block_number == 0 {
+                    continue;
                 }
+
+                // Try to add entry to this doubly-indirect block
+                entry_on_db(block_number, inode, new_entry);
+                return;
             }
-            entry_on_db(block, inode, new_entry);
         }
 
         if inode.get_triply_indirect_block() != 0 {
@@ -882,38 +836,12 @@ fn find_by_path(path: &str) -> Option<DirEntry> {
                 return Some(entry);
             }
         } else {
-            serial_println!("File not found: {}", current_path);
+            println!("File not found: {}", current_path);
             return None;
         }
     }
-    serial_println!("File found: {}", path);
+    println!("File found: {}", path);
     None
-}
-
-fn offset_to_block(offset: usize, addresses_per_block: usize) {
-    // let addresses_per_block = block_size;
-    let mut block_number = offset / addresses_per_block;
-    if block_number < 12 {
-        return;
-    }
-    block_number -= 12;
-    if block_number < addresses_per_block {
-        return;
-    }
-    block_number -= addresses_per_block;
-    if block_number < addresses_per_block * addresses_per_block {
-        let inidrect_block = block_number / addresses_per_block;
-        let direct_block = block_number % addresses_per_block;
-        return;
-    }
-    block_number -= addresses_per_block * addresses_per_block;
-    if block_number < addresses_per_block * addresses_per_block * addresses_per_block {
-        let dindirect_block = block_number / addresses_per_block / addresses_per_block;
-        let indirect_block = block_number / addresses_per_block % addresses_per_block;
-        let direct_block = block_number % addresses_per_block;
-        return;
-    }
-    serial_println!("Error: block {} is too large", offset / addresses_per_block);
 }
 
 fn get_files_in_dir(path: &str) -> Vec<DirEntry> {
@@ -1016,7 +944,6 @@ fn get_files_in_dir(path: &str) -> Vec<DirEntry> {
 }
 
 pub fn ls(path: Option<&str>) -> Vec<FileData> {
-    use alloc::format;
     let path = path.unwrap_or(".");
     let entries = get_files_in_dir(path);
 
