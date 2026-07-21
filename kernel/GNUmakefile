@@ -14,7 +14,7 @@ release:
 
 .PHONY: clippy
 clippy:
-	RUSTFLAGS="-W clippy::all" cargo clippy --target x86_64-unknown-none --all-targets
+	RUSTFLAGS="-W clippy::all" cargo clippy --target x86_64-unknown-none --lib --bins
 
 .PHONY: check
 check:
