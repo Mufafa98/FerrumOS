@@ -90,15 +90,12 @@ impl Glyphs {
             let b2_data: u32 = (data[1] & 0b00111111).into();
             let result: u32 = (b1_data << 6) | b2_data;
             Some(result)
-        } else if data[0] & 0b00000000 == 0b00000000 {
-            // Single byte
+        } else if data[0] & 0b10000000 == 0b00000000 {
+            // Single byte (0xxxxxxx)
             let result: u32 = data[0] as u32;
             Some(result)
-        } else if data[0] & 0b10000000 == 0b10000000 {
-            // Continuation byte
-            None
         } else {
-            // Error
+            // Invalid (continuation byte or error)
             None
         }
     }
