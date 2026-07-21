@@ -38,16 +38,15 @@ impl File {
             if read_result.is_err() {
                 serial_println!("Failed to read from disk . Error {:?}", read_result.err());
             }
-            let block_number = u32::from_le_bytes([
+            u32::from_le_bytes([
                 inode_buf[read_offset],
                 inode_buf[read_offset + 1],
                 inode_buf[read_offset + 2],
                 inode_buf[read_offset + 3],
-            ]);
-            return block_number;
+            ])
         }
 
-        let block_size = SUPERBLOCK.lock().get_block_size() as usize;
+        let block_size = SUPERBLOCK.lock().get_block_size();
         let addresses_per_block = block_size / 4;
         let mut block_number = offset / block_size;
         if block_number < 12 {
@@ -115,11 +114,11 @@ impl File {
             let current_block_offset = self.offset % block_size;
             let mut current_iter_counter = 0;
 
-            for i in current_block_offset..data.len() {
-                if start_offset + bytes_read >= file_size || bytes_read >= size || data[i] == 0 {
+            for item in data.iter().skip(current_block_offset) {
+                if start_offset + bytes_read >= file_size || bytes_read >= size || *item == 0 {
                     return bytes_read;
                 }
-                buffer[bytes_read] = data[i];
+                buffer[bytes_read] = *item;
                 bytes_read += 1;
                 current_iter_counter += 1;
             }
@@ -177,11 +176,11 @@ impl File {
             let mut data = read_1kb_block(current_block, block_size);
             let current_block_offset = self.offset % block_size as usize;
 
-            for pos in current_block_offset..data.len() {
+            for item in data.iter_mut().skip(current_block_offset) {
                 if bytes_written >= size {
                     break;
                 }
-                data[pos] = buffer[bytes_written];
+                *item = buffer[bytes_written];
                 bytes_written += 1;
                 self.offset += 1;
             }
@@ -234,13 +233,13 @@ impl File {
     }
 
     pub fn seek(&mut self, offset: usize) {
-        if offset > self.inode.get_size() as usize {
+        if offset > self.inode.get_size() {
             panic!("Error: seek out of bounds");
         }
         self.offset = offset;
     }
 
     pub fn seek_end(&mut self) {
-        self.offset = self.inode.get_size() as usize;
+        self.offset = self.inode.get_size();
     }
 }

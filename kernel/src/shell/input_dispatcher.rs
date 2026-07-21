@@ -3,14 +3,14 @@ use pc_keyboard::DecodedKey;
 pub struct InputDispatcher {
     focus: InputTarget,
 }
-
-impl InputDispatcher {
-    pub fn new() -> Self {
-        InputDispatcher {
+impl Default for InputDispatcher {
+    fn default() -> Self {
+        Self {
             focus: InputTarget::Shell,
         }
     }
-
+}
+impl InputDispatcher {
     pub fn dispatch_key(&mut self, key: DecodedKey) {
         match self.focus {
             InputTarget::Shell => {
@@ -35,5 +35,5 @@ enum InputTarget {
 }
 
 lazy_static::lazy_static! {
-    pub static ref INPUT_DISPATCHER: spin::Mutex<InputDispatcher> = spin::Mutex::new(InputDispatcher::new());
+    pub static ref INPUT_DISPATCHER: spin::Mutex<InputDispatcher> = spin::Mutex::new(InputDispatcher::default());
 }

@@ -19,13 +19,14 @@ pub struct FixedSizeBlockAllocator {
 
 impl FixedSizeBlockAllocator {
     /// Create a new empty FixedSizeBlockAllocator
+    #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
-        // This is needed because we can't use Copy trait on Option<&'static mut ListNode>
         const EMPTY: Option<&'static mut ListNode> = None;
         FixedSizeBlockAllocator {
             list_heads: [EMPTY; BLOCK_SIZES.len()],
             fallback_allocator: linked_list_allocator::Heap::empty(),
         }
+        // This is needed because we can't use Copy trait on Option<&'static mut ListNode>
     }
     /// Initialize the allocator with the given heap bounds
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {

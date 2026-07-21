@@ -40,8 +40,8 @@ pub struct Shell {
     commands: BTreeMap<String, Box<dyn Command>>,
     key_buffer: String,
 }
-impl Shell {
-    pub fn new() -> Self {
+impl Default for Shell {
+    fn default() -> Self {
         let mut commands = BTreeMap::new();
         add_commands!(commands,
             help => HelpCommand,        // HELP
@@ -64,7 +64,8 @@ impl Shell {
             key_buffer: String::new(),
         }
     }
-
+}
+impl Shell {
     pub fn handle_input(&mut self, key: pc_keyboard::DecodedKey) {
         match key {
             pc_keyboard::DecodedKey::Unicode(c) => {
@@ -101,7 +102,7 @@ impl Shell {
     }
 
     pub fn list_commands(&self) {
-        for (_, cmd) in &self.commands {
+        for cmd in self.commands.values() {
             println!(
                 "{}: {}",
                 cmd.name().to_string().fg(colors::CYAN),
@@ -122,7 +123,7 @@ impl Shell {
 
 lazy_static! {
     /// Global shell instance
-    pub static ref SHELL: Mutex<Shell> = Mutex::new(Shell::new());
+    pub static ref SHELL: Mutex<Shell> = Mutex::new(Shell::default());
 }
 
 pub fn print_caret() {

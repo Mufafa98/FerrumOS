@@ -157,10 +157,15 @@ impl Feature {
 #[allow(unused)]
 pub enum CompressionAlg {
     NoComp,
+    #[allow(clippy::upper_case_acronyms)]
     LZV1,
+    #[allow(clippy::upper_case_acronyms)]
     LZRW3A,
+    #[allow(clippy::upper_case_acronyms)]
     GZIP,
+    #[allow(clippy::upper_case_acronyms)]
     BZIP2,
+    #[allow(clippy::upper_case_acronyms)]
     LZO,
 }
 impl CompressionAlg {

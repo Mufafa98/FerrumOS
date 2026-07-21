@@ -12,8 +12,8 @@ pub struct Rsdp {
     // extended_checksum: u8,
     // reserved: [u8; 3],
 }
-impl Rsdp {
-    pub fn new() -> Self {
+impl Default for Rsdp {
+    fn default() -> Self {
         let rsdp_response = RSDP_REQUEST.get_response().unwrap();
         let rsdp_address = rsdp_response.address();
         let signature = unsafe { *(rsdp_address as *const [u8; 8]) };
@@ -29,12 +29,14 @@ impl Rsdp {
             rsdt_address,
         }
     }
+}
+impl Rsdp {
     pub fn is_valid(&self) -> bool {
         let mut sum: u32 = 0;
         let ptr = self as *const Self as *const u8;
         let size = core::mem::size_of::<Self>();
         for i in 0..size {
-            let oct = unsafe { *ptr.offset(i as isize) };
+            let oct = unsafe { *ptr.add(i) };
             sum += oct as u32;
         }
         sum &= 0xff;

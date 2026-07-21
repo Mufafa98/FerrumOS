@@ -30,7 +30,7 @@ mod colors;
 // #[cfg(feature = "vga")]
 // #[macro_export]
 // macro_rules! println {
-//     () => ($crate::print!("\n"));
+//     () => ($crate::print!('\n'));
 //     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 // }
 // #[cfg(feature = "vga")]

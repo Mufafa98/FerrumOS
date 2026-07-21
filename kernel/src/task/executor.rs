@@ -11,16 +11,16 @@ pub struct Executor {
     task_queue: Arc<ArrayQueue<TaskId>>,
     waker_cache: BTreeMap<TaskId, Waker>,
 }
-
-impl Executor {
-    /// Create a new Executor
-    pub fn new() -> Self {
+impl Default for Executor {
+    fn default() -> Self {
         Executor {
             tasks: BTreeMap::new(),
             task_queue: Arc::new(ArrayQueue::new(100)),
             waker_cache: BTreeMap::new(),
         }
     }
+}
+impl Executor {
     /// Spawn a new task to be executed by the executor
     pub fn spawn(&mut self, task: Task) {
         // Set the task ID
@@ -62,7 +62,7 @@ impl Executor {
             // having to look up the waker again
             let waker = waker_cache
                 .entry(task_id)
-                .or_insert_with(|| TaskWaker::new(task_id, task_queue.clone()));
+                .or_insert_with(|| TaskWaker::new_waker(task_id, task_queue.clone()));
             // Create a new context from the waker
             let mut context = Context::from_waker(waker);
             // Poll the task
@@ -148,7 +148,7 @@ impl TaskWaker {
         self.task_queue.push(self.task_id).expect("task_queue full");
     }
     /// Create a new TaskWaker
-    fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
+    fn new_waker(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
         Waker::from(Arc::new(TaskWaker {
             task_id,
             task_queue,

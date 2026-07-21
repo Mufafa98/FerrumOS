@@ -10,6 +10,7 @@ use core::ptr;
 /// a pointer to the next free address. It only frees all memory at once when the `dealloc` function
 /// is called. It is very fast for allocating memory, but it is inefficient in terms of memory usage.
 
+#[derive(Default)]
 pub struct BumpAllocator {
     heap_start: usize,
     heap_end: usize,
@@ -18,15 +19,6 @@ pub struct BumpAllocator {
 }
 
 impl BumpAllocator {
-    /// Create a new empty bump allocator
-    pub const fn new() -> Self {
-        BumpAllocator {
-            heap_start: 0,
-            heap_end: 0,
-            next: 0,
-            allocations: 0,
-        }
-    }
     /// Initialize the bump allocator with the given heap bounds
     /// # Safety
     /// This function is unsafe because the caller must guarantee that the given heap bounds are

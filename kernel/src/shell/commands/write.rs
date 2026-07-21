@@ -62,7 +62,7 @@ impl Command for WriteCommand {
         }
         let mut offset = 0;
         loop {
-            let bytes_to_write = content.as_bytes().len() - offset;
+            let bytes_to_write = content.len() - offset;
             if bytes_to_write == 0 {
                 break; // All content has been written
             }

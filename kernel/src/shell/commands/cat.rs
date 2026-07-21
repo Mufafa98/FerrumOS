@@ -32,7 +32,6 @@ impl Command for CatCommand {
             return;
         }
         use crate::fs::ext2::file::File;
-        let args = args;
         for file_path in args {
             let file = File::from_path(file_path);
             if file.is_err() {
@@ -46,11 +45,12 @@ impl Command for CatCommand {
                 if bytes_read == 0 {
                     break; // End of file
                 }
-                for i in 0..bytes_read {
-                    if buffer[i] == 0 {
-                        continue; // Skip null bytes
+                // for i in 0..bytes_read
+                for item in buffer.iter().take(bytes_read) {
+                    if *item == 0 {
+                        continue;
                     }
-                    print!("{}", buffer[i] as char);
+                    print!("{}", *item as char);
                 }
             }
         }

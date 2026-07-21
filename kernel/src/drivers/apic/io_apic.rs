@@ -7,9 +7,13 @@ pub struct IOAPICStruct {
 }
 #[allow(dead_code)]
 enum IOAPICReg {
+    #[allow(clippy::upper_case_acronyms)]
     IOAPICID = 0x00,
+    #[allow(clippy::upper_case_acronyms)]
     IOAPICVER = 0x01,
+    #[allow(clippy::upper_case_acronyms)]
     IOAPICARB = 0x02,
+    #[allow(clippy::upper_case_acronyms)]
     IOAPICREDTBL = 0x10,
 }
 #[allow(dead_code)]
@@ -38,7 +42,7 @@ impl IOAPICStruct {
         }
     }
     fn set_mask(&self, interrupt: u8, mask: bool) {
-        let reg = (IOAPICReg::IOAPICREDTBL as u32 + (interrupt as u32) * 2) as u32;
+        let reg = IOAPICReg::IOAPICREDTBL as u32 + (interrupt as u32) * 2;
         let value = self.read_register(reg);
 
         if value & 0x10000 != 0 {
@@ -62,15 +66,11 @@ use lazy_static::lazy_static;
 use crate::ok;
 lazy_static! {
     static ref IO_APIC: IOAPICStruct = {
-        let ioapic = {
-            use crate::drivers::acpi::{rsdp::Rsdp, rsdt::RSDT};
-            let rsdp = Rsdp::new();
-            let rsdt_header = RSDT::new(rsdp.rsdt_address());
-            let madt = rsdt_header.get_madt().expect("No MADT found");
-            madt.get_ioapic().expect("No IOAPIC found")
-        };
-
-        ioapic
+        use crate::drivers::acpi::{rsdp::Rsdp, rsdt::RSDT};
+        let rsdp = Rsdp::default();
+        let rsdt_header = RSDT::new(rsdp.rsdt_address());
+        let madt = rsdt_header.get_madt().expect("No MADT found");
+        madt.get_ioapic().expect("No IOAPIC found")
     };
 }
 pub fn init() {

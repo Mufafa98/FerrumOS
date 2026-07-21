@@ -1,5 +1,4 @@
 use alloc::vec;
-use core::usize;
 
 use crate::fs::ext2::inode::build_inode;
 // use crate::serial_println;
@@ -61,14 +60,14 @@ pub fn write_1kb_block(block_number: u32, block_size: u32, buffer: &[u8], size: 
     let data_1 = &buffer[0..512];
     let data_2 = &buffer[512..1024];
 
-    let write_result = ata::write(0, block_1, &data_1);
+    let write_result = ata::write(0, block_1, data_1);
     if write_result.is_err() {
         println!(
             "Failed to write first part of data on disk {:?}",
             write_result.err()
         );
     }
-    let write_result = ata::write(0, block_2, &data_2);
+    let write_result = ata::write(0, block_2, data_2);
     if write_result.is_err() {
         println!(
             "Failed to write second part of data on disk {:?}",
@@ -84,7 +83,7 @@ enum DirEntryType {
     Directory = 2,
     CharacterDevice = 3,
     BlockDevice = 4,
-    FIFO = 5,
+    Fifo = 5,
     Socket = 6,
     Symlink = 7,
 }
@@ -96,20 +95,20 @@ impl DirEntryType {
             2 => DirEntryType::Directory,
             3 => DirEntryType::CharacterDevice,
             4 => DirEntryType::BlockDevice,
-            5 => DirEntryType::FIFO,
+            5 => DirEntryType::Fifo,
             6 => DirEntryType::Socket,
             7 => DirEntryType::Symlink,
             _ => DirEntryType::Unknown,
         }
     }
-    fn to_u8(&self) -> u8 {
+    fn to_u8(self) -> u8 {
         match self {
             DirEntryType::Unknown => 0,
             DirEntryType::RegularFile => 1,
             DirEntryType::Directory => 2,
             DirEntryType::CharacterDevice => 3,
             DirEntryType::BlockDevice => 4,
-            DirEntryType::FIFO => 5,
+            DirEntryType::Fifo => 5,
             DirEntryType::Socket => 6,
             DirEntryType::Symlink => 7,
         }
@@ -206,7 +205,7 @@ impl DirEntry {
         };
 
         // Check if path already exists
-        if let Some(_) = find_by_path(trimmed_path) {
+        if find_by_path(trimmed_path).is_some() {
             return Err(DirEntryError::EntryAlreadyExists);
         }
 
@@ -361,9 +360,7 @@ impl DirEntry {
 
                 Ok(())
             }
-            _ => {
-                return Err(DirEntryError::UnsuportedEntryType);
-            }
+            _ => Err(DirEntryError::UnsuportedEntryType),
         }
     }
 
@@ -524,22 +521,23 @@ impl DirEntry {
                 return Ok(());
             }
         }
-        if inode.get_indirect_block() != 0 {
-            if dealloc_i(inode.get_indirect_block(), self, block_size).unwrap_or(false) {
-                return Ok(());
-            }
+        if inode.get_indirect_block() != 0
+            && dealloc_i(inode.get_indirect_block(), self, block_size).unwrap_or(false)
+        {
+            return Ok(());
         }
-        if inode.get_doubly_indirect_block() != 0 {
-            if dealloc_di(inode.get_doubly_indirect_block(), self, block_size).unwrap_or(false) {
-                return Ok(());
-            }
+        if inode.get_doubly_indirect_block() != 0
+            && dealloc_di(inode.get_doubly_indirect_block(), self, block_size).unwrap_or(false)
+        {
+            return Ok(());
         }
-        if inode.get_triply_indirect_block() != 0 {
-            if dealloc_ti(inode.get_triply_indirect_block(), self, block_size).unwrap_or(false) {
-                return Ok(());
-            }
+
+        if inode.get_triply_indirect_block() != 0
+            && dealloc_ti(inode.get_triply_indirect_block(), self, block_size).unwrap_or(false)
+        {
+            return Ok(());
         }
-        return Err(DirEntryError::InodeDeallocationFailed);
+        Err(DirEntryError::InodeDeallocationFailed)
     }
 
     fn add_to_inode(&mut self, inode: &mut Inode) {
@@ -564,7 +562,7 @@ impl DirEntry {
 
             if remaining_space < new_entry.size() || block == 0 {
                 let new_block = inode.allocate_new_block();
-                if new_block == None {
+                if new_block.is_none() {
                     println!("Failed to allocate new block for entry {}", new_entry.name);
                     return;
                 }
@@ -613,7 +611,7 @@ impl DirEntry {
             }
         }
 
-        fn entry_on_db(block: u32, inode: &mut Inode, new_entry: &mut DirEntry) {
+        fn entry_on_db(block: u32, _inode: &mut Inode, _new_entry: &mut DirEntry) {
             let block_size = SUPERBLOCK.lock().get_block_size() as u32;
             let data = read_1kb_block(block, block_size);
 
@@ -631,7 +629,7 @@ impl DirEntry {
                 }
 
                 // Try to add entry to this doubly-indirect block
-                entry_on_db(block_number, inode, new_entry);
+                entry_on_db(block_number, _inode, _new_entry);
                 return;
             }
         }
@@ -956,7 +954,7 @@ pub fn ls(path: Option<&str>) -> Vec<FileData> {
             DirEntryType::RegularFile => "FILE",
             DirEntryType::CharacterDevice => "CHAR",
             DirEntryType::BlockDevice => "BLOCK",
-            DirEntryType::FIFO => "FIFO",
+            DirEntryType::Fifo => "FIFO",
             DirEntryType::Socket => "SOCK",
             DirEntryType::Symlink => "LINK",
             DirEntryType::Unknown => "UNKN",
@@ -964,7 +962,7 @@ pub fn ls(path: Option<&str>) -> Vec<FileData> {
         let size = inode.get_size();
         result.push(FileData {
             entry_type: entry_type.to_string(),
-            size: size,
+            size,
             name: entry.name.clone(),
             inode: inode.get_id(),
         });

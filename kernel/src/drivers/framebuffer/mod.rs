@@ -48,7 +48,7 @@ impl FrameBuffer {
             }
             return Err(FrameBufferError::NoFrameBufferFound);
         }
-        return Err(FrameBufferError::ResponseNotReady);
+        Err(FrameBufferError::ResponseNotReady)
     }
     /// Puts a pixel on the screen at the given coordinates with the given color.
     pub fn put_pixel(&self, x: u64, y: u64, color: u32) {

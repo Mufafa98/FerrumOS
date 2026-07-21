@@ -34,12 +34,10 @@ impl BubTextWriter {
         match character {
             '\n' => {
                 self.write_newline();
-                return;
             }
             '\x08' => {
                 // Move the cursor back by one character
                 self.move_back_cursor();
-                return;
             }
             normal_char => {
                 // Check if we reached the end of the screen

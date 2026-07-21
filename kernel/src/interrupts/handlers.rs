@@ -145,7 +145,7 @@ pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFr
     {
         let mut tasks = SLEEP_TASKS.lock();
         // let mut finished = vec![];
-        for (_, entry) in tasks.iter_mut() {
+        for entry in tasks.values_mut() {
             if entry.remaining > 0 {
                 entry.remaining -= 1;
                 if entry.remaining == 0 {

@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 #[allow(dead_code)]
 #[derive(Debug)]
 enum MADTEntry {
-    LocalApicEntry {
+    LocalApic {
         // Type 0
         processor_id: u8, // ACPI Processor ID
         apic_id: u8,      // Local APIC ID
@@ -12,41 +12,41 @@ enum MADTEntry {
                           //    bit = 0: Processor Enabled
                           //    bit = 1: Online Capable
     },
-    IoApicEntry {
+    IoApic {
         // Type 1
         ioapic_id: u8,                     // IO APIC ID
         ioapic_address: u32,               // IO APIC Address
         global_system_interrupt_base: u32, // Global System Interrupt Base
     },
-    IoApicInterruptSourceOverrideEntry {
+    IoApicInterruptSourceOverride {
         // Type 2
         bus_source: u8,
         irq_source: u8,
         global_system_interrupt: u32,
         flags: u16,
     },
-    // IoApicNmiSourceEntry {
+    // IoApicNmiSource {
     //     // Type 3
     //     nmi_source: u8,
     //     flags: u16,
     //     global_system_interrupt: u32,
     // },
-    LocalApicNmiEntry {
+    LocalApicNmi {
         // Type 4
         processor_id: u8,
         flags: u16,
         local_apic_lint: u8,
     },
-    // LocalApicAddressOverrideEntry {
+    // LocalApicAddressOverride {
     //     local_apic_address: u64,
     // },
-    // PeocessorLocalX2ApicEntry {
+    // PeocessorLocalX2Apic {
     //     x2apic_id: u32,
     //     flags: u32,
     //     acpi_processor_uid: u32,
     // },
 }
-#[allow(dead_code)]
+#[allow(dead_code, clippy::upper_case_acronyms)]
 pub struct MADT {
     header: ACPISDTHeader,
     local_apic_address: u32,
@@ -78,7 +78,7 @@ impl MADT {
                     let flags = unsafe { ptr::read_unaligned((entries_offset + 4) as *const u32) };
                     entries_offset += record_length as u32;
 
-                    let entry = MADTEntry::LocalApicEntry {
+                    let entry = MADTEntry::LocalApic {
                         processor_id,
                         apic_id,
                         flags,
@@ -93,7 +93,7 @@ impl MADT {
                     let global_system_interrupt_base =
                         unsafe { ptr::read_unaligned((entries_offset + 8) as *const u32) };
                     entries_offset += record_length as u32;
-                    let entry = MADTEntry::IoApicEntry {
+                    let entry = MADTEntry::IoApic {
                         ioapic_id,
                         ioapic_address,
                         global_system_interrupt_base,
@@ -109,7 +109,7 @@ impl MADT {
                         unsafe { ptr::read_unaligned((entries_offset + 4) as *const u32) };
                     let flags = unsafe { ptr::read_unaligned((entries_offset + 8) as *const u16) };
                     entries_offset += record_length as u32;
-                    let entry = MADTEntry::IoApicInterruptSourceOverrideEntry {
+                    let entry = MADTEntry::IoApicInterruptSourceOverride {
                         bus_source,
                         irq_source,
                         global_system_interrupt,
@@ -125,7 +125,7 @@ impl MADT {
                         unsafe { ptr::read_unaligned((entries_offset + 5) as *const u8) };
                     entries_offset += record_length as u32;
 
-                    let entry = MADTEntry::LocalApicNmiEntry {
+                    let entry = MADTEntry::LocalApicNmi {
                         processor_id,
                         flags,
                         local_apic_lint,
@@ -158,19 +158,17 @@ impl MADT {
     }
     pub fn get_ioapic(&self) -> Option<IOAPICStruct> {
         for entry in self.entries.iter() {
-            match entry {
-                MADTEntry::IoApicEntry {
-                    ioapic_id,
-                    ioapic_address,
-                    global_system_interrupt_base,
-                } => {
-                    return Some(IOAPICStruct::new(
-                        *ioapic_id,
-                        *ioapic_address,
-                        *global_system_interrupt_base,
-                    ));
-                }
-                _ => {}
+            if let MADTEntry::IoApic {
+                ioapic_id,
+                ioapic_address,
+                global_system_interrupt_base,
+            } = entry
+            {
+                return Some(IOAPICStruct::new(
+                    *ioapic_id,
+                    *ioapic_address,
+                    *global_system_interrupt_base,
+                ));
             }
         }
         None

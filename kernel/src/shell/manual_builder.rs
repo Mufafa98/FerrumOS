@@ -104,7 +104,7 @@ impl ManualBuilder {
     }
 
     pub fn build_short(&self) -> String {
-        format!("{}", self.short_description,)
+        self.short_description.to_string()
     }
     pub fn build_long(&self) -> String {
         let description = "Description:\n".bold().fg(colors::LIGHT_BLUE);
@@ -125,22 +125,22 @@ impl ManualBuilder {
             .join("\n");
         let mut long_message = String::new();
         long_message.push_str(&description);
-        long_message.push_str("\n");
+        long_message.push('\n');
         long_message.push_str(&self.long_description);
         long_message.push_str("\n\n");
         long_message.push_str(&usage);
-        long_message.push_str("\n");
+        long_message.push('\n');
         long_message.push_str(&self.usage);
         long_message.push_str("\n\n");
         if !self.args.is_empty() {
             long_message.push_str(&args);
-            long_message.push_str("\n");
+            long_message.push('\n');
             long_message.push_str(&arg_items);
             long_message.push_str("\n\n");
         }
         if !self.examples.is_empty() {
             long_message.push_str(&examples);
-            long_message.push_str("\n");
+            long_message.push('\n');
             long_message.push_str(&example_items);
         }
         add_newline_if_needed(&long_message)
@@ -149,9 +149,9 @@ impl ManualBuilder {
         let usage = "Usage:\n".bold().fg(colors::LIGHT_BLUE);
         let mut usage_message = String::new();
         usage_message.push_str(&usage);
-        usage_message.push_str("\n");
+        usage_message.push('\n');
         usage_message.push_str(&self.usage);
-        usage_message.push_str("\n");
+        usage_message.push('\n');
         add_newline_if_needed(&usage_message)
     }
 }

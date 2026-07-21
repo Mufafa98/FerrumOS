@@ -1,4 +1,5 @@
 // TO DO Documentation
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct PITConfig(u8);
 #[allow(dead_code)]
@@ -29,9 +30,6 @@ pub enum PITEncoding {
 }
 #[allow(dead_code)]
 impl PITConfig {
-    pub fn new() -> Self {
-        PITConfig(0b0)
-    }
     pub fn build_from(
         encoding: PITEncoding,
         mode: PITOperatingMode,

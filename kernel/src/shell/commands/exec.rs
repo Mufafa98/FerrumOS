@@ -67,7 +67,7 @@ impl Command for ExecCommand {
                             return;
                         }
                     };
-                    let task_id = task::TaskId::new();
+                    let task_id = task::TaskId::default();
                     let temp_task = Task::new_with_id(
                         task_id.as_u64(),
                         crate::task::demo_task::demo_task_runner(

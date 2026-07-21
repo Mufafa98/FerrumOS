@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 lazy_static! {
     /// A static instance of the ScancodeStream
-    pub static ref GLOBAL_EXECUTOR: Mutex<executor::Executor> = Mutex::new(executor::Executor::new());
+    pub static ref GLOBAL_EXECUTOR: Mutex<executor::Executor> = Mutex::new(executor::Executor::default());
     pub static ref ADD_TASK_Q: Mutex<crossbeam_queue::ArrayQueue<Task>> =
         Mutex::new(crossbeam_queue::ArrayQueue::new(100));
     pub static ref REM_TASK_Q: Mutex<crossbeam_queue::ArrayQueue<u64>> =
@@ -41,7 +41,7 @@ impl Task {
     /// Create a new Task
     pub fn new(future: impl Future<Output = ()> + 'static) -> Task {
         Task {
-            id: TaskId::new(),
+            id: TaskId::default(),
             future: Box::pin(future),
         }
     }
@@ -63,15 +63,16 @@ impl Task {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// An identifier for a task
 pub struct TaskId(u64);
-
-impl TaskId {
+impl Default for TaskId {
     /// Create a new TaskId with a unique identifier
-    pub fn new() -> Self {
+    fn default() -> Self {
         // This will create a new unique identifier for each task
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         TaskId(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
+}
 
+impl TaskId {
     fn from(id: u64) -> Self {
         TaskId(id)
     }

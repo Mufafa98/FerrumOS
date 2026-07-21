@@ -19,19 +19,19 @@ impl BlockGroupDescriptor {
         bgd
     }
     pub fn get_inode_table_start_address(&self) -> usize {
-        return self.inode_table as usize;
+        self.inode_table as usize
     }
     pub fn get_free_block_count(&self) -> usize {
-        return self.free_blocks_count as usize;
+        self.free_blocks_count as usize
     }
     pub fn get_free_inode_count(&self) -> usize {
-        return self.free_inodes_count as usize;
+        self.free_inodes_count as usize
     }
     pub fn get_b_bitmap_block(&self) -> usize {
-        return self.block_usage_bitmap as usize;
+        self.block_usage_bitmap as usize
     }
     pub fn get_i_bitmap_block(&self) -> usize {
-        return self.inode_usage_bitmap as usize;
+        self.inode_usage_bitmap as usize
     }
     unsafe fn to_bytes(&self) -> Vec<u8> {
         let raw_data = core::slice::from_raw_parts(
@@ -144,8 +144,8 @@ impl BlockGroupDescriptorTable {
                 if read_result.is_err() {
                     panic!("Failed to read from disk");
                 }
-                for j in 0..512 {
-                    disk_data.push(buf[j]);
+                for item in &buf {
+                    disk_data.push(*item);
                 }
             }
             let mut write_flag = false;
@@ -163,12 +163,12 @@ impl BlockGroupDescriptorTable {
             }
             if write_flag {
                 let write_buf = &disk_data[0..512];
-                let write_result = ata::write(0, 4, &write_buf);
+                let write_result = ata::write(0, 4, write_buf);
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }
                 let write_buf = &disk_data[512..1024];
-                let write_result = ata::write(0, 5, &write_buf);
+                let write_result = ata::write(0, 5, write_buf);
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }

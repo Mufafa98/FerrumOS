@@ -37,7 +37,7 @@ pub mod colors {
     }
 
     pub fn get_color(value: u16, bright: bool) -> Color {
-        let color = match value {
+        match value {
             30 | 40 => {
                 if bright {
                     LIGHT_GRAY
@@ -95,8 +95,7 @@ pub mod colors {
                 }
             }
             _ => BLACK, // Default to black for out of range values
-        };
-        return color;
+        }
     }
 }
 

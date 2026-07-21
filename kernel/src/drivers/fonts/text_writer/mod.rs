@@ -25,7 +25,6 @@ macro_rules! print {
     ($($arg:tt)*) => ($crate::drivers::fonts::text_writer::_print(format_args!($($arg)*)));
 }
 /// Prints to the STOUT trough the framebuffer interface, appending a newline
-
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));

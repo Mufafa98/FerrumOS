@@ -44,12 +44,12 @@ impl HPET {
     }
     pub fn enable(&self) {
         let mut config = self.get_register(HPETRegisters::GeneralConfiguration);
-        config = config | 1;
+        config |= 1;
         self.set_register(HPETRegisters::GeneralConfiguration, config);
     }
     pub fn disable(&self) {
         let mut config = self.get_register(HPETRegisters::GeneralConfiguration);
-        config = config & !1;
+        config &= !1;
         self.set_register(HPETRegisters::GeneralConfiguration, config);
     }
     pub fn set_register(&self, register: HPETRegisters, value: u64) {
@@ -91,8 +91,8 @@ impl HPETTimerConfig {
         let idx_mask = !((0b11111 << 9) as u64);
         let idx = (idx as u64) << 9;
         let mut config = self.get_register();
-        config = config & idx_mask;
-        config = config | idx;
+        config &= idx_mask;
+        config |= idx;
         unsafe { core::ptr::write_unaligned(self.base_address as *mut u64, config) }
     }
     pub fn enable_interrupt(&self) {

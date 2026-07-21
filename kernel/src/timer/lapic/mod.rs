@@ -19,7 +19,7 @@ pub fn lapic_calibrate() -> u32 {
         "LAPICTimer calibrated with a frequency of {} MHz",
         ticks / 10000
     );
-    return ticks;
+    ticks
 }
 
 fn lapic_calibrate_ticks() -> u32 {
@@ -39,7 +39,7 @@ fn lapic_calibrate_ticks() -> u32 {
     LAPICTimer::set_divide(LAPICTimerDivideValue::Div1);
     LAPICTimer::set_ticks(ticks);
     LAPICTimer::set_active(false);
-    return ticks / 1000; // Return ticks per 10 ms
+    ticks / 1000 // Return ticks per 10 ms
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -73,25 +73,25 @@ impl LAPICTimer {
     fn set_periodic(periodic: bool) {
         let mut lvt = LOCAL_APIC.read_register(LAPICReg::TimerLVT);
         if periodic {
-            lvt = lvt | (1 << 17);
+            lvt |= 1 << 17;
         } else {
-            lvt = lvt & !(1 << 17);
+            lvt &= !(1 << 17);
         }
         LOCAL_APIC.write_register(LAPICReg::TimerLVT, lvt);
     }
     fn set_active(active: bool) {
         let mut lvt = LOCAL_APIC.read_register(LAPICReg::TimerLVT);
         if !active {
-            lvt = lvt | (1 << 16);
+            lvt |= 1 << 16;
         } else {
-            lvt = lvt & !(1 << 16);
+            lvt &= !(1 << 16);
         }
         LOCAL_APIC.write_register(LAPICReg::TimerLVT, lvt);
     }
     fn set_divide(divide: LAPICTimerDivideValue) {
         let mut lvt = LOCAL_APIC.read_register(LAPICReg::TimerDCnf);
-        lvt = lvt & 0b1111_1000;
-        lvt = lvt | divide as u32;
+        lvt &= 0b1111_1000;
+        lvt |= divide as u32;
         LOCAL_APIC.write_register(LAPICReg::TimerDCnf, lvt);
     }
     fn set_ticks(ticks: u32) {

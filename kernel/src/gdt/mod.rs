@@ -101,11 +101,10 @@ lazy_static! {
             // The stack is marked as unsafe because it is a static mutable reference
             // and the address of the stack is taken
             let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
-            let stack_end = stack_start
+            stack_start
                 + STACK_SIZE
                     .try_into()
-                    .expect("[Allocator]: Failed to fit usize into u64 in TSS initialization(GDT)");
-            stack_end
+                    .expect("[Allocator]: Failed to fit usize into u64 in TSS initialization(GDT)")
         };
         tss
     };

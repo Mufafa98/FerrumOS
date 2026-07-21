@@ -15,7 +15,7 @@ enum Drive {
     Slave = 1,
 }
 impl Drive {
-    fn to_bool(&self) -> bool {
+    fn to_bool(self) -> bool {
         match self {
             Drive::Master => false,
             Drive::Slave => true,
@@ -36,22 +36,30 @@ enum Command {
 #[allow(dead_code)]
 #[repr(usize)]
 enum Status {
+    #[allow(clippy::upper_case_acronyms)]
     ERR = 0,
+    #[allow(clippy::upper_case_acronyms)]
     IDX = 1,
+    #[allow(clippy::upper_case_acronyms)]
     CORR = 2,
+    #[allow(clippy::upper_case_acronyms)]
     DRQ = 3,
+    #[allow(clippy::upper_case_acronyms)]
     SRV = 4,
+    #[allow(clippy::upper_case_acronyms)]
     DF = 5,
+    #[allow(clippy::upper_case_acronyms)]
     RDY = 6,
+    #[allow(clippy::upper_case_acronyms)]
     BSY = 7,
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
-struct UDMA {
+struct Udma {
     mode: u8,
 }
-impl UDMA {
+impl Udma {
     /// Constructor for UDMA that is called after the IDENTIFY command on the
     /// 88th u16 of the buffer
     ///
@@ -68,7 +76,7 @@ impl UDMA {
         while upper >> mode & 0b1 == 0 {
             mode += 1;
         }
-        UDMA { mode }
+        Udma { mode }
     }
 }
 #[allow(dead_code)]
@@ -91,7 +99,7 @@ struct ATARegisters {
 impl ATARegisters {
     fn new(io_base: u16, ctrl_base: u16) -> Self {
         Self {
-            data_register: Port::new(io_base + 0),
+            data_register: Port::new(io_base),
             error_register: PortReadOnly::new(io_base + 1),
             features_register: PortWriteOnly::new(io_base + 1),
             sector_count_register: Port::new(io_base + 2),
@@ -102,8 +110,8 @@ impl ATARegisters {
             status_register: PortReadOnly::new(io_base + 7),
             command_register: PortWriteOnly::new(io_base + 7),
 
-            alternate_status_register: PortReadOnly::new(ctrl_base + 0),
-            control_register: PortWriteOnly::new(ctrl_base + 0),
+            alternate_status_register: PortReadOnly::new(ctrl_base),
+            control_register: PortWriteOnly::new(ctrl_base),
             drive_blockess_register: PortReadOnly::new(ctrl_base + 1),
         }
     }
@@ -130,7 +138,7 @@ pub struct Bus {
 
     slave: Option<bool>,
     lba48_supported: Option<bool>,
-    udma: Option<UDMA>,
+    udma: Option<Udma>,
     lba28_adr_sectors: Option<u32>,
     lba48_adr_sectors: Option<u64>,
 }
@@ -158,7 +166,7 @@ impl Bus {
     fn identify(&mut self, drive: Drive) -> Result<(), BusError> {
         use crate::timer::hpet::HPETTimer;
         use crate::timer::Time;
-        let hpet_timer = HPETTimer::new();
+        let hpet_timer = HPETTimer::default();
         let debug_str = format!(
             "ATA {} ",
             if drive == Drive::Master {
@@ -225,14 +233,14 @@ impl Bus {
             ok!("{}Drive is ready", debug_str);
 
             let mut buf = [0u16; 256];
-            for i in 0..256 {
-                buf[i] = self.ata_reg.data_register.read();
+            for item in &mut buf {
+                *item = self.ata_reg.data_register.read();
             }
 
-            self.udma = Some(UDMA::from_ibf(buf[88]));
+            self.udma = Some(Udma::from_ibf(buf[88]));
             let mut lba32 = 0;
             lba32 |= (buf[61] as u32) << 16;
-            lba32 |= (buf[60] as u32) << 0;
+            lba32 |= buf[60] as u32;
             self.lba28_adr_sectors = Some(lba32);
             self.lba48_supported = Some(buf[83] >> 10 & 0b1 == 1);
             if self.lba48_supported.unwrap() {
@@ -240,11 +248,11 @@ impl Bus {
                 lba48 |= (buf[103] as u64) << 48;
                 lba48 |= (buf[102] as u64) << 32;
                 lba48 |= (buf[101] as u64) << 16;
-                lba48 |= (buf[100] as u64) << 0;
+                lba48 |= buf[100] as u64;
                 self.lba48_adr_sectors = Some(lba48);
             }
             ok!("{}Successfully identified drive", debug_str);
-            return Ok(());
+            Ok(())
         }
     }
 
@@ -264,10 +272,10 @@ impl Bus {
                     .lba2_register
                     .write(block.get_bits(16..24) as u8);
             }
-            return Ok(());
+            Ok(())
         } else {
             // panic!("Slave drive not set. Maybe init() was not called?");
-            return Err(BusError::NotInitMembers);
+            Err(BusError::NotInitMembers)
         }
     }
 
@@ -299,8 +307,8 @@ impl Bus {
             // panic!("Buffer size must be 512 bytes");
             return Err(BusError::InvalidBufferSize);
         }
-        let setup_result = self.setup28(block as u32);
-        if let Ok(_) = setup_result {
+        let setup_result = self.setup28(block);
+        if setup_result.is_ok() {
             self.write_command(Command::Read);
             while self.is_busy() {}
 
@@ -310,7 +318,7 @@ impl Bus {
                 buf[i * 2 + 1] = (data >> 8) as u8;
             }
         }
-        return setup_result;
+        setup_result
     }
 
     pub fn write(&mut self, block: BlockIndex, buf: &[u8]) -> Result<(), BusError> {
@@ -318,12 +326,12 @@ impl Bus {
             // panic!("Buffer size must be 512 bytes");
             return Err(BusError::InvalidBufferSize);
         }
-        let setup_result = self.setup28(block as u32);
-        if let Ok(_) = setup_result {
+        let setup_result = self.setup28(block);
+        if setup_result.is_ok() {
             self.write_command(Command::Write);
             while self.is_busy() {}
             for i in 0..256 {
-                let mut data = 0 as u16;
+                let mut data = 0_u16;
                 data.set_bits(0..8, buf[i * 2] as u16);
                 data.set_bits(8..16, buf[i * 2 + 1] as u16);
 
@@ -332,7 +340,7 @@ impl Bus {
                 while self.is_busy() {}
             }
         }
-        return setup_result;
+        setup_result
     }
 
     pub fn get_block(&self, address: u32) -> BlockIndex {

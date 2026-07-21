@@ -109,7 +109,7 @@ impl TdfTextWriter {
         font.set_padding_before(1); // No padding before
         font.set_padding_after(1); // No padding after
 
-        let tdf = TdfTextWriter {
+        TdfTextWriter {
             x_position: font.get_width() as u64, // Start at the first character position
             y_position: font.get_height() as u64, // Start at the first line
             fg_color: Color::new(255, 255, 255, 255),
@@ -118,8 +118,7 @@ impl TdfTextWriter {
             font_size_multiplier: 1,
             saved_cursor: None,
             bold: false,
-        };
-        tdf
+        }
     }
 
     /// Writes a character to the framebuffer
@@ -128,8 +127,6 @@ impl TdfTextWriter {
         match character {
             '\n' => {
                 self.write_newline();
-                // self.print_caret();
-                return;
             }
             _ => {
                 // Wrap to the next line if the character would not fit.

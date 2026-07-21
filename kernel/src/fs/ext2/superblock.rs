@@ -103,23 +103,23 @@ impl Superblock {
     }
 
     pub fn get_block_size(&self) -> usize {
-        return 1024 << self.base.block_size;
+        1024 << self.base.block_size
     }
 
     pub fn get_inode_size(&self) -> usize {
-        return self.extended_fields.inode_size as usize;
+        self.extended_fields.inode_size as usize
     }
 
     pub fn get_inodes_per_group(&self) -> usize {
-        return self.base.inodes_per_group as usize;
+        self.base.inodes_per_group as usize
     }
 
     pub fn get_block_group_count(&self) -> usize {
-        return self.block_groups_count as usize;
+        self.block_groups_count as usize
     }
 
     pub fn get_blocks_per_group(&self) -> usize {
-        return self.base.blocks_per_group as usize;
+        self.base.blocks_per_group as usize
     }
 
     unsafe fn to_bytes(&self) -> Vec<u8> {
@@ -146,31 +146,25 @@ impl Superblock {
                 if read_result.is_err() {
                     panic!("Failed to read from disk");
                 }
-                for j in 0..512 {
-                    disk_data.push(buf[j]);
+                for item in &buf {
+                    disk_data.push(*item);
                 }
             }
             let mut write_flag = false;
             for i in 0..self_data.len() {
                 if self_data[i] != disk_data[i] {
-                    // serial_println!(
-                    //     "Data mismatch at index {}: {} != {}",
-                    //     i,
-                    //     self_data[i],
-                    //     disk_data[i]
-                    // );
                     disk_data[i] = self_data[i];
                     write_flag = true;
                 }
             }
             if write_flag {
                 let write_buf = &disk_data[0..512];
-                let write_result = ata::write(0, 2, &write_buf);
+                let write_result = ata::write(0, 2, write_buf);
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }
                 let write_buf = &disk_data[512..1024];
-                let write_result = ata::write(0, 3, &write_buf);
+                let write_result = ata::write(0, 3, write_buf);
                 if write_result.is_err() {
                     panic!("Failed to write to disk");
                 }
@@ -198,6 +192,6 @@ impl Superblock {
     }
 
     pub fn get_first_free_data_block(&self) -> u32 {
-        return self.base.superblock_block_number;
+        self.base.superblock_block_number
     }
 }

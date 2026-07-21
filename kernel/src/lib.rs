@@ -17,7 +17,7 @@ pub mod task;
 pub mod timer;
 pub mod utils;
 use limine::{
-    request::{HhdmRequest, KernelAddressRequest},
+    request::{ExecutableAddressRequest, HhdmRequest},
     BaseRevision,
 };
 #[used]
@@ -25,7 +25,7 @@ use limine::{
 static BASE_REVISION: BaseRevision = BaseRevision::new();
 #[used]
 #[link_section = ".requests"]
-static KERNEL_ADDRESS_REQUEST: KernelAddressRequest = KernelAddressRequest::new();
+static KERNEL_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
 #[used]
 #[link_section = ".requests"]
 pub static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
@@ -54,7 +54,7 @@ pub fn init() {
     ok!("Level 4 page table initialized");
     ok!("Heap initialized");
 
-    let kernel_address = KERNEL_ADDRESS_REQUEST.get_response().expect("nu merge");
+    let _kernel_address = KERNEL_ADDRESS_REQUEST.get_response().expect("nu merge");
     // println!("Kernel phys address: {:#X}", kernel_address.physical_base());
     // serial_println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
     // println!("Kernel virt address: {:#X}", kernel_address.virtual_base());
@@ -64,8 +64,6 @@ pub fn init() {
     crate::timer::lapic::lapic_calibrate();
     drivers::ata::init();
 }
-
-
 
 /// Performant empty loop thet saves cpu time
 pub fn hlt_loop() -> ! {

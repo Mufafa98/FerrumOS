@@ -4,10 +4,10 @@ pub struct HPETTimer {
     hpet: HPET,
     frequency: Time,
 }
-impl HPETTimer {
-    pub fn new() -> Self {
+impl Default for HPETTimer {
+    fn default() -> Self {
         use crate::drivers::acpi::{rsdp::Rsdp, rsdt::RSDT};
-        let rsdp = Rsdp::new();
+        let rsdp = Rsdp::default();
         let rsdt_table = RSDT::new(rsdp.rsdt_address());
         let hpet = rsdt_table.get_hpet().unwrap();
         let frequency =
@@ -16,6 +16,8 @@ impl HPETTimer {
         hpet.get_timer_n_config(2).enable_interrupt();
         HPETTimer { hpet, frequency }
     }
+}
+impl HPETTimer {
     // TODO better class design
     pub fn sleep(&self, duration: Time) {
         use crate::interrupts::handlers::{HPET_SLEEP_COUNTER, HPET_SLEEP_FLAG};

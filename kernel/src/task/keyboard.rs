@@ -18,7 +18,7 @@ static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
 pub(crate) fn add_scancode(scancode: u8) {
     // Try to get the scancode queue
     if let Ok(queue) = SCANCODE_QUEUE.try_get() {
-        if let Err(_) = queue.push(scancode) {
+        if queue.push(scancode).is_err() {
             // If the scancode queue is full, print a warning
             println!("WARNING: scancode queue full; dropping keyboard input");
         } else {
@@ -34,9 +34,8 @@ pub(crate) fn add_scancode(scancode: u8) {
 pub struct ScancodeStream {
     _private: (),
 }
-impl ScancodeStream {
-    /// Create a new ScancodeStream
-    pub fn new() -> Self {
+impl Default for ScancodeStream {
+    fn default() -> Self {
         // Initialize the scancode queue
         // This should only be called once
         SCANCODE_QUEUE
@@ -63,7 +62,7 @@ impl Stream for ScancodeStream {
         // and try to pop the scancode again. If the scancode
         // is still not available, return pending else
         // return ready with the scancode and clear the waker
-        WAKER.register(&context.waker());
+        WAKER.register(context.waker());
         match queue.pop() {
             Some(scancode) => {
                 WAKER.take();
@@ -79,7 +78,7 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 /// Print keypresses
 pub async fn print_keypresses() {
     // Create a new scancode stream
-    let mut scancodes = ScancodeStream::new();
+    let mut scancodes = ScancodeStream::default();
     // Create a new keyboard with the US layout
     let mut keyboard = Keyboard::new(
         ScancodeSet1::new(),

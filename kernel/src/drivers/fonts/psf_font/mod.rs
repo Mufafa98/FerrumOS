@@ -35,7 +35,7 @@ impl PsfFont {
         let height = u32::from_le_bytes([data[24], data[25], data[26], data[27]]);
         let width = u32::from_le_bytes([data[28], data[29], data[30], data[31]]);
         let glyphs = Glyphs::new(&data[32..], numglyph, bytesperglyph);
-        let result = PsfFont {
+        PsfFont {
             magic,
             version,
             headersize,
@@ -47,9 +47,7 @@ impl PsfFont {
             glyphs,
             padding_before: 0, // Default padding before
             padding_after: 0,  // Default padding after
-        };
-
-        result
+        }
     }
     /// Gets the height of the font
     pub fn get_height(&self) -> u32 {
@@ -78,30 +76,25 @@ impl PsfFont {
         let glyph = self.find_glyph(character as u32).unwrap_or([0; 16]);
 
         let font_height = self.get_height() as u64;
-        let font_width =
-            self.get_width() as u64 - self.padding_before as u64 - self.padding_after as u64;
+        let font_width = self.get_width() as u64 - self.padding_before - self.padding_after;
 
-        let padding_before = self.padding_before as u64;
-        let padding_after = self.padding_after as u64;
+        let padding_before = self.padding_before;
+        let padding_after = self.padding_after;
 
         for row in 0..font_height {
             let total_cell_width = font_width + padding_before + padding_after;
             for col in 0..total_cell_width {
-                let color;
-
-                if col >= padding_before && col < padding_before + font_width {
+                let color = if col >= padding_before && col < padding_before + font_width {
                     let glyph_col = col - padding_before;
                     let bit = glyph[row as usize] & (1 << (font_width - 1 - glyph_col));
-                    color = {
-                        if bit != 0 {
-                            fg_color
-                        } else {
-                            bg_color
-                        }
-                    };
+                    if bit != 0 {
+                        fg_color
+                    } else {
+                        bg_color
+                    }
                 } else {
-                    color = bg_color;
-                }
+                    bg_color
+                };
 
                 let pixel_coord = (
                     position.0 + col * font_size_multiplier,
@@ -199,9 +192,7 @@ impl PsfFont {
     /// Gets the glyph data for the given index
     fn get_glyph(&self, index: u32) -> [u8; 16] {
         let mut glyph = [0; 16];
-        for i in 0..16 {
-            glyph[i] = self.glyphs.get_glyph(index as usize)[i];
-        }
+        glyph.copy_from_slice(&self.glyphs.get_glyph(index as usize)[..16]);
         glyph
     }
     /// Finds the glyph for the given unicode

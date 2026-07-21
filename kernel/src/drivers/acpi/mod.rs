@@ -19,8 +19,7 @@ struct ACPISDTHeader {
 use core::ptr;
 impl ACPISDTHeader {
     fn new(base_ptr: u32) -> Self {
-        let signature =
-            unsafe { ptr::read_unaligned((base_ptr as *const [u8; 4]) as *const [u8; 4]) };
+        let signature = unsafe { ptr::read_unaligned(base_ptr as *const [u8; 4]) };
         let length = unsafe { ptr::read_unaligned((base_ptr as u64 + 4) as *const u32) };
         let revision = unsafe { ptr::read_unaligned((base_ptr as u64 + 8) as *const u8) };
         let checksum = unsafe { ptr::read_unaligned((base_ptr as u64 + 9) as *const u8) };
@@ -46,7 +45,7 @@ impl ACPISDTHeader {
         let ptr = self as *const Self as *const u8;
         let size = core::mem::size_of::<Self>();
         for i in 0..size {
-            let oct = unsafe { *ptr.offset(i as isize) };
+            let oct = unsafe { *ptr.add(i) };
             sum += oct as u32;
         }
         sum

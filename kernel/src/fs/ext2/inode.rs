@@ -7,7 +7,7 @@ use crate::serial_println;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum InodeType {
-    FIFO,
+    Fifo,
     CharacterDevice,
     Directory,
     BlockDevice,
@@ -85,30 +85,20 @@ fn find_first_free_block() -> Option<u32> {
         let block = bg_desc.get_b_bitmap_block();
         let data = read_1kb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
         // serial_println!("Block address phys {:#X}", block * 1024);
-        for i in 0..data.len() {
-            let byte = data[i];
+        for (i, item) in data.iter().enumerate() {
+            let byte = *item;
             if byte == 0xFF {
                 continue;
             }
             for j in 0..8 {
                 let control_bit = 0b1 << j;
-                // Print all available blocks
-                // serial_println!(
-                //     "Block {} group {} byte {} bit {} data {:08b} is free? {}",
-                //     (i * 8 + j) + id * blocks_per_group + first_free_block,
-                //     id,
-                //     i,
-                //     j,
-                //     byte,
-                //     byte & control_bit == 0
-                // );
                 if byte & control_bit == 0 {
                     return Some(((i * 8 + j) + id * blocks_per_group + first_free_block) as u32);
                 }
             }
         }
     }
-    return None;
+    None
 }
 
 fn mark_block_as_used(block_number: usize) {
@@ -176,8 +166,8 @@ fn find_first_free_inode() -> Option<u32> {
         }
         let block = bg_desc.get_i_bitmap_block();
         let data = read_1kb_block(block as u32, SUPERBLOCK.lock().get_block_size() as u32);
-        for i in 0..data.len() {
-            let byte = data[i];
+        for (i, item) in data.iter().enumerate() {
+            let byte = *item;
             if byte == 0xFF {
                 continue;
             }
@@ -189,7 +179,7 @@ fn find_first_free_inode() -> Option<u32> {
             }
         }
     }
-    return None;
+    None
 }
 
 fn mark_inode_as_used(inode_number: usize) {
@@ -355,7 +345,7 @@ impl Inode {
         // 3. Read the inode table block
         let data = super::read_1kb_block(inode_table_offset as u32, block_size as u32);
         let ndata = &data[offset_in_block..offset_in_block + inode_size];
-        let inode_base = InodeBaseFields::new(&ndata);
+        let inode_base = InodeBaseFields::new(ndata);
         Inode {
             base: inode_base,
             id: inode_id,
@@ -411,7 +401,7 @@ impl Inode {
         }
         // If we haven t found any free spaces in the indirect list then return
         // None and try to look in the next list (in this case the doubly ind)
-        return None;
+        None
     }
 
     fn alloc_address_in_indirect_block(
@@ -464,7 +454,7 @@ impl Inode {
         }
         // If we haven t found any free spaces in the dindirect list then return
         // None and try to look in the next list (in this case the thirdly ind)
-        return None;
+        None
     }
 
     fn alloc_address_in_doubly_indirect_block(
@@ -518,7 +508,7 @@ impl Inode {
         }
         // If we haven t found any free spaces in the dindirect list then return
         // None and try to look in the next list (in this case the thirdly ind)
-        return None;
+        None
     }
 
     fn alloc_on_direct_block(&mut self, data_block: u32) -> Option<u32> {
@@ -542,7 +532,7 @@ impl Inode {
         // if we reach this point it means that there is no free space
         // in the direct block pointers, so we need to search in the next
         // list (in this case the indirect block)
-        return None;
+        None
     }
 
     fn alloc_on_indirect_block(&mut self, data_block: u32) -> Option<u32> {
@@ -558,7 +548,7 @@ impl Inode {
         let mut direct_block = data_block;
 
         if indirect_block == 0 {
-            self.base.indirect_block_pointer = data_block as u32;
+            self.base.indirect_block_pointer = data_block;
             mark_block_as_used(data_block as usize);
             direct_block = find_first_free_block().unwrap();
         }
@@ -566,7 +556,7 @@ impl Inode {
         self.alloc_address_in_direct_block(
             self.base.indirect_block_pointer,
             block_size,
-            direct_block as u32,
+            direct_block,
         )
     }
 
@@ -583,14 +573,14 @@ impl Inode {
         let mut indirect_block = data_block;
 
         if doubly_indirect_block == 0 {
-            self.base.doubly_indirect_block_pointer = data_block as u32;
+            self.base.doubly_indirect_block_pointer = data_block;
             mark_block_as_used(data_block as usize);
             indirect_block = find_first_free_block().unwrap();
         }
         self.alloc_address_in_indirect_block(
             self.base.doubly_indirect_block_pointer,
             block_size,
-            indirect_block as u32,
+            indirect_block,
         )
     }
 
@@ -600,7 +590,7 @@ impl Inode {
         let triply_indirect_block = self.base.triply_indirect_block_pointer;
         let mut doubly_indirect_block = data_block;
         if triply_indirect_block == 0 {
-            self.base.triply_indirect_block_pointer = data_block as u32;
+            self.base.triply_indirect_block_pointer = data_block;
             mark_block_as_used(data_block as usize);
             doubly_indirect_block = find_first_free_block().unwrap();
         }
@@ -608,12 +598,12 @@ impl Inode {
         self.alloc_address_in_doubly_indirect_block(
             self.base.triply_indirect_block_pointer,
             block_size,
-            doubly_indirect_block as u32,
+            doubly_indirect_block,
         )
     }
 
     pub fn allocate_new_block(&mut self) -> Option<u32> {
-        let data_block = find_first_free_block().unwrap() as u32;
+        let data_block = find_first_free_block().unwrap();
         if let Some(block) = self.alloc_on_direct_block(data_block) {
             // serial_println!("Allocated on direct block: {}", data_block);
             return Some(block);
@@ -630,7 +620,7 @@ impl Inode {
             // serial_println!("Allocated on triply indirect block: {}", data_block);
             return Some(block);
         }
-        return None;
+        None
     }
 
     #[allow(unused)]
@@ -809,12 +799,12 @@ impl Inode {
                 (self.block * sb.get_block_size()) / 512
             };
             let write_buf = &disk_data[0..512];
-            let write_result = ata::write(0, current_block as u32, &write_buf);
+            let write_result = ata::write(0, current_block as u32, write_buf);
             if write_result.is_err() {
                 panic!("Failed to write to disk");
             }
             let write_buf = &disk_data[512..1024];
-            let write_result = ata::write(0, (current_block + 1).try_into().unwrap(), &write_buf);
+            let write_result = ata::write(0, (current_block + 1).try_into().unwrap(), write_buf);
             if write_result.is_err() {
                 panic!("Failed to write to disk");
             }
@@ -827,7 +817,7 @@ impl Inode {
     pub fn get_type(&self) -> InodeType {
         let file_type = self.base.mode & 0xF000;
         match file_type {
-            0x1000 => InodeType::FIFO,
+            0x1000 => InodeType::Fifo,
             0x2000 => InodeType::CharacterDevice,
             0x4000 => InodeType::Directory,
             0x6000 => InodeType::BlockDevice,
@@ -840,41 +830,41 @@ impl Inode {
 
     #[allow(unused)]
     pub fn get_permissions(&self) -> u16 {
-        return self.base.mode & 0x0FFF;
+        self.base.mode & 0x0FFF
     }
 
     #[allow(unused)]
     pub fn has_flag(&self, flag: InodeFlags) -> bool {
         serial_println!("Flag: {:?}", self);
-        return (self.base.flags & flag as u32) != 0;
+        (self.base.flags & flag as u32) != 0
     }
 
     pub fn get_direct_block(&self, index: usize) -> u32 {
         if index < 12 {
-            return self.base.direct_block_pointers[index];
+            self.base.direct_block_pointers[index]
         } else {
             panic!("Index out of bounds");
         }
     }
 
     pub fn get_direct_blocks(&self) -> &[u32] {
-        return &self.base.direct_block_pointers;
+        &self.base.direct_block_pointers
     }
 
     pub fn get_indirect_block(&self) -> u32 {
-        return self.base.indirect_block_pointer;
+        self.base.indirect_block_pointer
     }
 
     pub fn get_doubly_indirect_block(&self) -> u32 {
-        return self.base.doubly_indirect_block_pointer;
+        self.base.doubly_indirect_block_pointer
     }
 
     pub fn get_triply_indirect_block(&self) -> u32 {
-        return self.base.triply_indirect_block_pointer;
+        self.base.triply_indirect_block_pointer
     }
 
     pub fn get_size(&self) -> usize {
-        return self.base.size_low as usize;
+        self.base.size_low as usize
     }
 
     pub fn set_size(&mut self, size: usize) {
@@ -882,12 +872,12 @@ impl Inode {
     }
 
     pub fn set_block_count(&mut self, count: u32) {
-        self.base.disk_sectors_count = count;
+        self.base.disk_sectors_count = count
     }
 
     #[allow(unused)]
     pub fn get_block_count(&self) -> u32 {
-        return self.base.disk_sectors_count;
+        self.base.disk_sectors_count
     }
 
     pub fn inc_hard_links_count(&mut self) {
@@ -978,7 +968,7 @@ impl Inode {
             dealloc_di(self.get_doubly_indirect_block());
             dealloc_i(self.get_indirect_block());
             for block in self.get_direct_blocks() {
-                dealloc_d(block.clone());
+                dealloc_d(*block);
             }
             mark_inode_as_free(self.id);
             self.clear();
@@ -1024,7 +1014,7 @@ pub fn build_inode(inode_type: InodeType) -> Inode {
         os_specific_2: 0,
     };
     base.mode = match inode_type {
-        InodeType::FIFO => 0x1000,
+        InodeType::Fifo => 0x1000,
         InodeType::CharacterDevice => 0x2000,
         InodeType::Directory => 0x4000,
         InodeType::BlockDevice => 0x6000,
@@ -1068,6 +1058,6 @@ pub fn build_inode(inode_type: InodeType) -> Inode {
     if inode_type == InodeType::Directory {
         inode.set_size(1024);
     }
-    mark_inode_as_used(free_inode as usize);
+    mark_inode_as_used(free_inode);
     inode
 }

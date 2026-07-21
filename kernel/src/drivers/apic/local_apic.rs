@@ -81,8 +81,7 @@ lazy_static! {
             panic!("APIC Not Supported");
         }
         LocalAPIC::disable_pic();
-        let local_apic = LocalAPIC::init();
-        local_apic
+        LocalAPIC::init()
     };
 }
 

@@ -197,6 +197,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
                 let mut color_type = ColorType::None;
                 #[derive(PartialEq, Eq, Debug)]
                 enum ColorSet {
+                    #[allow(clippy::upper_case_acronyms)]
                     RGB,
                     #[allow(unused)]
                     Indexed,
@@ -323,7 +324,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
             }
             b'J' => {
                 // ED - Erase in Display
-                match self.params.get(0).map(|p| *p as u8) {
+                match self.params.first().map(|p| *p as u8) {
                     Some(2) | None => {
                         // Clear entire screen
                         self.performer.clear_screen();
@@ -342,7 +343,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
                     let row = self.params[0] as u64;
                     let col = self.params[2] as u64;
                     self.performer.move_cursor(row, col);
-                } else if self.params.len() == 0 {
+                } else if self.params.is_empty() {
                 } else {
                     self.state = AnsiiParserState::Ground;
                     serial_println!("CUP code not implemented with params: {:?}", self.params);
@@ -351,7 +352,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
             }
             b'n' => {
                 // DSR - Device Status Report
-                match self.params.get(0).map(|p| *p as u8) {
+                match self.params.first().map(|p| *p as u8) {
                     Some(6) => {
                         // Report cursor position
                         self.performer.print_cursor_position();
@@ -381,7 +382,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
             }
             b'D' => {
                 let (col, row) = self.performer.get_cursor_position();
-                if self.params.len() == 0 {
+                if self.params.is_empty() {
                     self.state = AnsiiParserState::Ground;
                     self.performer.move_cursor(row, col - 1);
                 } else if self.params.len() == 2 {

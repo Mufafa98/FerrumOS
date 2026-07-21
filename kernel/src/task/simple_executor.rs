@@ -8,13 +8,15 @@ use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 pub struct SimpleExecutor {
     task_queue: VecDeque<Task>,
 }
-impl SimpleExecutor {
+impl Default for SimpleExecutor {
     /// Create a new SimpleExecutor with an empty task queue
-    pub fn new() -> SimpleExecutor {
+    fn default() -> Self {
         SimpleExecutor {
             task_queue: VecDeque::new(),
         }
     }
+}
+impl SimpleExecutor {
     /// Spawn a new task to be executed by the executor
     pub fn spawn(&mut self, task: Task) {
         self.task_queue.push_back(task)
@@ -47,7 +49,7 @@ fn dummy_raw_waker() -> RawWaker {
     // Create a RawWakerVTable with the clone and no_op functions
     let vtable = &RawWakerVTable::new(clone, no_op, no_op, no_op);
     // Create a RawWaker with a null pointer and the vtable
-    RawWaker::new(0 as *const (), vtable)
+    RawWaker::new(core::ptr::null::<()>(), vtable)
 }
 /// Create a dummy Waker
 fn dummy_waker() -> Waker {

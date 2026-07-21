@@ -34,14 +34,14 @@ impl ListNode {
 pub struct LinkedListAllocator {
     head: ListNode,
 }
-
-impl LinkedListAllocator {
-    /// Create a new empty LinkedListAllocator
-    pub const fn new() -> Self {
+impl Default for LinkedListAllocator {
+    fn default() -> Self {
         Self {
             head: ListNode::new(0),
         }
     }
+}
+impl LinkedListAllocator {
     /// Initialize the allocator with the given heap bounds
     /// # Safety
     /// This function is unsafe because the caller must guarantee that the given heap bounds are
@@ -77,7 +77,7 @@ impl LinkedListAllocator {
         // Iterate over the list
         while let Some(ref mut region) = current.next {
             // Try to allocate from the region
-            if let Ok(alloc_start) = Self::alloc_from_region(&region, size, align) {
+            if let Ok(alloc_start) = Self::alloc_from_region(region, size, align) {
                 // If the region can hold the block, return it
                 // and remove it from the list by updating the current node's next pointer
                 let next = region.next.take();
