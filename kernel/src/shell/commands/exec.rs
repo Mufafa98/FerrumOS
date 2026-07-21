@@ -1,9 +1,8 @@
 use crate::shell::manual_builder::ManualBuilder;
-use crate::shell::{Command, Shell};
-use crate::task::executor::{self, Executor};
+use crate::shell::Command;
 use crate::task::Task;
-use crate::{print, println, serial_print, serial_println, task};
-use alloc::string::{String, ToString};
+use crate::{print, println, task};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 pub struct ExecCommand {
@@ -40,7 +39,7 @@ impl Command for ExecCommand {
                 ),
         }
     }
-    fn execute(&self, args: alloc::vec::Vec<&str>, shell: &crate::shell::Shell) {
+    fn execute(&self, args: alloc::vec::Vec<&str>, _: &crate::shell::Shell) {
         if args.is_empty() {
             print!("{}", self.manual.build_usage());
             return;
@@ -78,7 +77,7 @@ impl Command for ExecCommand {
                         ),
                     );
                     use crate::task::ADD_TASK_Q;
-                    let mut add_task_q = ADD_TASK_Q.lock();
+                    let add_task_q = ADD_TASK_Q.lock();
                     if add_task_q.push(temp_task).is_err() {
                         println!("Failed to add task to the queue");
                     } else {

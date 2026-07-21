@@ -1,7 +1,7 @@
+use crate::print;
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
-use crate::{print, println};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 pub struct RmCommand {
     manual: ManualBuilder,
@@ -22,7 +22,7 @@ impl Command for RmCommand {
                 .example("rm old_folder", "Removes the directory named 'old_folder'"),
         }
     }
-    fn execute(&self, args: Vec<&str>, shell: &Shell) {
+    fn execute(&self, args: Vec<&str>, _: &Shell) {
         if args.is_empty() {
             print!("{}", self.manual.build_usage());
             return;

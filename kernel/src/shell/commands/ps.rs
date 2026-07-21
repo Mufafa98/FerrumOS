@@ -1,10 +1,8 @@
-use alloc::vec;
-
 use crate::println;
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::Command;
 use crate::task::RUNNING_TASKS;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
 pub struct PsCommand {
     manual: ManualBuilder,
@@ -29,9 +27,6 @@ impl Command for PsCommand {
     }
 
     fn execute(&self, _args: alloc::vec::Vec<&str>, _shell: &crate::shell::Shell) {
-        use crate::task::TaskId;
-        use alloc::collections::BTreeSet;
-        use alloc::vec::Vec;
         let running_tasks = RUNNING_TASKS.lock();
 
         for task_id in running_tasks.iter() {

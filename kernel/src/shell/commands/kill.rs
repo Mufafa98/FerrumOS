@@ -2,7 +2,7 @@ use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::Command;
 use crate::task::REM_TASK_Q;
 use crate::{print, println, serial_println};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
 pub struct KillCommand {
     manual: ManualBuilder,
@@ -42,9 +42,18 @@ impl Command for KillCommand {
             }
         };
         {
-            let mut rem_task_q = REM_TASK_Q.lock();
-            rem_task_q.push(task_id);
-            serial_println!("Task with ID {} has been scheduled for removal.", task_id);
+            let rem_task_q = REM_TASK_Q.lock();
+            match rem_task_q.push(task_id) {
+                Ok(_) => {
+                    serial_println!("Task with ID {} has been scheduled for removal.", task_id)
+                }
+                Err(_) => {
+                    serial_println!(
+                        "Task with ID {} was unable to be scheduled for removal.",
+                        task_id
+                    )
+                }
+            }
         }
     }
 

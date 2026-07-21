@@ -1,7 +1,4 @@
 use crate::shell::{manual_builder::ManualBuilder, Command};
-use crate::{print, println};
-use alloc::format;
-use alloc::string::String;
 pub struct CP437Command {
     manual: ManualBuilder,
 }
@@ -29,7 +26,7 @@ impl Command for CP437Command {
     fn manual(&self) -> alloc::string::String {
         self.manual.build_long()
     }
-    fn execute(&self, args: alloc::vec::Vec<&str>, shell: &crate::shell::Shell) {
+    fn execute(&self, _: alloc::vec::Vec<&str>, _: &crate::shell::Shell) {
         use crate::drivers::fonts::text_writer::TEXT_WRITER;
         TEXT_WRITER.lock().prin_available_chars();
     }

@@ -23,7 +23,7 @@ fn add_newline_if_needed(description: &str) -> String {
     let mut formatted = String::new();
 
     // Split by newline explicitly to preserve blank lines.
-    for (i, line) in description.split('\n').enumerate() {
+    for line in description.split('\n') {
         // If it’s just an empty line, preserve it.
         if line.is_empty() {
             formatted.push('\n');

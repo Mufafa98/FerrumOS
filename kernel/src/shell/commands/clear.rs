@@ -1,7 +1,7 @@
+use crate::print;
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
-use crate::{print, println};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 pub struct ClearCommand {
     manual: ManualBuilder,
@@ -21,7 +21,7 @@ impl Command for ClearCommand {
         }
     }
 
-    fn execute(&self, args: Vec<&str>, shell: &Shell) {
+    fn execute(&self, _: Vec<&str>, _: &Shell) {
         // Clear the terminal screen
         print!("\x1B[2J\x1B[1;1H");
     }

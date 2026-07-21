@@ -1,7 +1,7 @@
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
-use crate::{print, println, serial_println};
-use alloc::string::{String, ToString};
+use crate::{print, println};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 pub struct WriteCommand {
@@ -38,7 +38,7 @@ impl Command for WriteCommand {
                 ),
         }
     }
-    fn execute(&self, args: Vec<&str>, shell: &Shell) {
+    fn execute(&self, args: Vec<&str>, _: &Shell) {
         if args.is_empty() {
             print!("{}", self.manual.build_usage());
             return;
@@ -49,7 +49,7 @@ impl Command for WriteCommand {
         }
         let file_path = args[0];
         use crate::fs::ext2::file::File;
-        let mut file = File::from_path(file_path);
+        let file = File::from_path(file_path);
         if file.is_err() {
             println!("Error opening file: {}", file_path);
             return;
@@ -60,11 +60,10 @@ impl Command for WriteCommand {
             file.seek_end();
             content = args[2..].join(" ");
         }
-        let mut buffer = [0u8; 1024];
         let mut offset = 0;
         loop {
             let bytes_to_write = content.as_bytes().len() - offset;
-            if bytes_to_write <= 0 {
+            if bytes_to_write == 0 {
                 break; // All content has been written
             }
             let bytes_written = file.write(&content.as_bytes()[offset..], bytes_to_write);

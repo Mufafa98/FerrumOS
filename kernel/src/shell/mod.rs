@@ -101,7 +101,7 @@ impl Shell {
     }
 
     pub fn list_commands(&self) {
-        for (name, cmd) in &self.commands {
+        for (_, cmd) in &self.commands {
             println!(
                 "{}: {}",
                 cmd.name().to_string().fg(colors::CYAN),
@@ -110,7 +110,7 @@ impl Shell {
         }
     }
 
-    pub fn get_commands(&self) -> &BTreeMap<String, Box<dyn Command>> {
+    fn get_commands(&self) -> &BTreeMap<String, Box<dyn Command>> {
         &self.commands
     }
 }

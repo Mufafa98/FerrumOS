@@ -16,22 +16,22 @@ impl InputDispatcher {
             InputTarget::Shell => {
                 super::SHELL.lock().handle_input(key);
             }
-            InputTarget::Process(pid) => {}
-            InputTarget::None => {
+            InputTarget::_Process(_) => {}
+            InputTarget::_None => {
                 // No target set, ignore the key input
             }
         }
     }
 
-    pub fn set_focus(&mut self, target: InputTarget) {
+    fn _set_focus(&mut self, target: InputTarget) {
         self.focus = target;
     }
 }
 
 enum InputTarget {
     Shell,
-    Process(u32),
-    None,
+    _Process(u32),
+    _None,
 }
 
 lazy_static::lazy_static! {

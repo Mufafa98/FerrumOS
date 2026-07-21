@@ -1,7 +1,7 @@
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
 use crate::{print, println};
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 pub struct CatCommand {
     manual: ManualBuilder,
@@ -26,15 +26,15 @@ impl Command for CatCommand {
         }
     }
 
-    fn execute(&self, args: Vec<&str>, shell: &Shell) {
+    fn execute(&self, args: Vec<&str>, _: &Shell) {
         if args.is_empty() {
             print!("{}", self.manual.build_usage());
             return;
         }
         use crate::fs::ext2::file::File;
-        let mut args = args;
+        let args = args;
         for file_path in args {
-            let mut file = File::from_path(file_path);
+            let file = File::from_path(file_path);
             if file.is_err() {
                 println!("Error opening file: {}", file_path);
                 continue;
