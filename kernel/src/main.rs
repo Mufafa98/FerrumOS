@@ -4,7 +4,6 @@
 use alloc::string::{String, ToString};
 use ferrum_os::*;
 use task::{executor, keyboard, Task};
-use timer::Time;
 
 extern crate alloc;
 
@@ -32,28 +31,6 @@ unsafe extern "C" fn _start() -> ! {
     executor::run_executor();
 }
 
-fn calibrate() {
-    use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
-    use interrupts::InterruptIndexAPIC;
-    let ticks_per_ms = lapic_tick_per_ms();
-    LOCAL_APIC.write_register(LAPICReg::TimerLVT, InterruptIndexAPIC::LAPICTimer.as_u32());
-    LOCAL_APIC.write_register(LAPICReg::TimerDCnf, 0x3);
-    LOCAL_APIC.write_register(LAPICReg::TimerICnt, ticks_per_ms);
-    // serial_println!("start");
-    // temp_sleep(1000);
-    // serial_println!("end");
-    serial_println!("Ticks per ms: {}", ticks_per_ms);
-}
-fn lapic_tick_per_ms() -> u32 {
-    use drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
-    use timer::pit::PIT;
-    let measure_duration: u32 = 1000;
-    LOCAL_APIC.write_register(LAPICReg::TimerDCnf, 0x3);
-    LOCAL_APIC.write_register(LAPICReg::TimerICnt, 0xFFFFFFFF);
-    PIT::sleep(measure_duration as u64);
-    let ticks_raw = 0xFFFFFFFF - LOCAL_APIC.read_register(LAPICReg::TimerCCnt);
-    ticks_raw / measure_duration
-}
 fn welcome() {
     let title = "FerrumOs has started";
     let mut features = "".to_string();
@@ -131,23 +108,4 @@ fn _heap_test_debug() {
 fn _inf_rec() {
     _inf_rec();
     x86_64::instructions::hlt();
-}
-
-fn hpet() {
-    // use drivers::acpi::{
-    //     hpet::{HPETRegisters, HPET},
-    //     rsdp::Rsdp,
-    //     rsdt::RSDT,
-    // };
-    // let rsdp = Rsdp::new();
-    // let rsdt_table = RSDT::new(rsdp.rsdt_address());
-    // let hpet = rsdt_table.get_hpet().unwrap();
-    // let test_time = 100_000_000;
-    // hpet.set_timer_n_comparator(2, test_time);
-    // hpet.get_timer_n_config(2).set_interrupt_idx(0x12);
-    // hpet.get_timer_n_config(2).enable_interrupt();
-    // hpet.enable();
-    use crate::timer::hpet::HPETTimer;
-    let timer = HPETTimer::new();
-    timer.sleep(Time::Nanoseconds(10000));
 }

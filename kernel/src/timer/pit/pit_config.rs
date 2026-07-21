@@ -50,18 +50,18 @@ impl PITConfig {
     }
     pub fn set_encoding(&mut self, encoding: PITEncoding) {
         match encoding {
-            PITEncoding::Binary => self.0 = self.0 & 0b1111_1110,
-            PITEncoding::BCD => self.0 = self.0 | 0b1,
+            PITEncoding::Binary => self.0 &= 0b1111_1110,
+            PITEncoding::BCD => self.0 |= 0b1,
         }
     }
 
     pub fn set_mode(&mut self, mode: PITOperatingMode) {
-        self.0 = self.0 | (mode as u8) << 1;
+        self.0 |= (mode as u8) << 1;
     }
     pub fn set_access_mode(&mut self, access_mode: PITAccessMode) {
-        self.0 = self.0 | (access_mode as u8) << 4;
+        self.0 |= (access_mode as u8) << 4;
     }
     pub fn set_channel(&mut self, channel: PITChannel) {
-        self.0 = self.0 | (channel as u8) << 6;
+        self.0 |= (channel as u8) << 6;
     }
 }

@@ -11,8 +11,9 @@ pub struct PIT {
     config: PITConfig,
     reload: u16,
 }
-impl PIT {
-    pub fn new() -> Self {
+
+impl Default for PIT {
+    fn default() -> Self {
         PIT {
             config: PITConfig::build_from(
                 PITEncoding::Binary,
@@ -23,6 +24,9 @@ impl PIT {
             reload: 0,
         }
     }
+}
+
+impl PIT {
     // 1ms
     pub fn set_timer(&mut self, millis: u16) {
         self.reload = (BASE_FREQUENCY / 1000.0 * millis as f32) as u16;
@@ -67,7 +71,7 @@ impl PIT {
     }
     pub fn get_counter() -> u64 {
         use crate::interrupts::handlers::PIT_COUNTER;
-        let mut timer = PIT::new();
+        let mut timer = PIT::default();
         timer.set_timer(1);
         timer.set_mode(PITOperatingMode::RateGenerator);
         timer.start();
