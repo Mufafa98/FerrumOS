@@ -19,7 +19,7 @@ CPU_PARAMS       :=
 CUSTOM_PARAMS    := $(DISPLAY_TECH) $(DEBUG_PARAMS) $(CPU_PARAMS) $(DISK_PARAMS)
 
 # --- Build Rules ---
-.PHONY: all run check doc kernel clean distclean
+.PHONY: all run check doc kernel clean distclean clippy
 .SILENT: run check ovmf limine kernel $(IMAGE_NAME).iso clean distclean
 
 all: $(IMAGE_NAME).iso
@@ -36,6 +36,9 @@ check:
 
 doc:
 	$(MAKE) -C kernel doc
+
+clippy:
+	$(MAKE) -C kernel clippy
 
 ovmf:
 	mkdir -p ovmf

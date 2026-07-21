@@ -102,7 +102,7 @@ pacman -S xorriso
 The project is compilated using the `GNUmakefile` in the root of the project. 
 
 - `make limine` and `make ovmf` install limine and ovmf dependencies.
-- `make check`, `make doc` and `make kernel` run different cargo options: `check`, `doc` and `build` respectively.
+- `make check`, `make doc`, `make clippy` and `make kernel` run different cargo options: `check`, `doc`, `clippy` and `build` respectively.
 - `make run` installs the dependencies, creates the virtual disk with an ext2 filesystem, builds the image and starts qemu. Note that if the argument `MODE=d` is passed to this command, the operating system will be compiled in debug mode instead of release.
 
 ## Throubleshooting

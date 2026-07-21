@@ -12,6 +12,9 @@ release:
 	RUSTFLAGS=-Awarnings cargo build -r --target x86_64-unknown-none
 	cp target/x86_64-unknown-none/release/ferrum_os kernel.elf
 
+.PHONY: clippy
+clippy:
+	RUSTFLAGS="-W clippy::all" cargo clippy --target x86_64-unknown-none --all-targets -- -D warnings
 
 .PHONY: check
 check:
