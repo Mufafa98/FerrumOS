@@ -16,6 +16,7 @@ pub struct BubTextWriter {
 
 impl BubTextWriter {
     /// Creates a new text writer
+    #[allow(unused)]
     pub fn new() -> Self {
         let font = PsfFont::from(DEFAULT_FONT_DATA_BYTES);
 
@@ -64,6 +65,7 @@ impl BubTextWriter {
         }
     }
     /// Writes a string to the framebuffer
+    #[allow(unused)]
     pub fn write_string(&mut self, string: &str) {
         for character in string.chars() {
             self.write_char(character);
@@ -100,6 +102,7 @@ impl BubTextWriter {
         }
     }
 
+    #[allow(unused)]
     fn clear_screen(&mut self) {
         for row in 0..FRAMEBUFFER.get_height() {
             for col in 0..FRAMEBUFFER.get_width() {

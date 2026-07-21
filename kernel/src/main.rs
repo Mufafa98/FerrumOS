@@ -2,7 +2,7 @@
 #![no_main]
 
 use alloc::string::{String, ToString};
-use ferrum_os::{drivers::fonts::ansii_parser::ansii_builder::AnsiiString, task::demo_task, *};
+use ferrum_os::*;
 use task::{executor, keyboard, Task};
 use timer::Time;
 

@@ -1,29 +1,36 @@
 use alloc::vec::Vec;
 
-use crate::{
-    drivers::fonts::color::{self, colors},
-    serial_print, serial_println,
-};
+use crate::{drivers::fonts::color::colors, serial_println};
 
 pub mod ansii_builder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnsiiParserState {
+    #[allow(unused)]
     Anywhere = 0,
     CsiEntry = 1,
     CsiIgnore = 2,
     CsiIntermediate = 3,
     CsiParam = 4,
+    #[allow(unused)]
     DcsEntry = 5,
+    #[allow(unused)]
     DcsIgnore = 6,
+    #[allow(unused)]
     DcsIntermediate = 7,
+    #[allow(unused)]
     DcsParam = 8,
+    #[allow(unused)]
     DcsPassthrough = 9,
     Escape = 10,
+    #[allow(unused)]
     EscapeIntermediate = 11,
     Ground = 12,
+    #[allow(unused)]
     OscString = 13,
+    #[allow(unused)]
     SosPmApcString = 14,
+    #[allow(unused)]
     Utf8 = 15,
 }
 
@@ -191,6 +198,7 @@ impl<'a, T: Performer> AnsiiParser<'a, T> {
                 #[derive(PartialEq, Eq, Debug)]
                 enum ColorSet {
                     RGB,
+                    #[allow(unused)]
                     Indexed,
                     None,
                 }

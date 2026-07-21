@@ -1,12 +1,10 @@
 //! A simple example task that demonstrates cooperative multitasking.
 
-use crate::interrupts::handlers::LAPIC_TIMER_SLEEP_COUNTER;
 use crate::task::TaskId;
 use crate::{print, serial_println};
 use core::future::Future;
 use core::pin::Pin;
 use core::sync::atomic::{AtomicBool, Ordering};
-use core::task::Waker;
 use core::task::{Context, Poll};
 use spin::Mutex;
 
@@ -90,9 +88,6 @@ lazy_static::lazy_static! {
 /// and then repeats. This demonstrates that the executor is running multiple
 /// tasks by interleaving their execution.
 pub async fn demo_task_runner(character_to_print: char, sleep_duration: u64, id: TaskId) {
-    use crate::task::TaskId;
-    use core::task::Waker;
-
     // Get current task ID for cancellation support
     let task_id = id;
 

@@ -2,8 +2,6 @@ use super::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;
 use super::FRAMEBUFFER;
 use crate::drivers::fonts::color::Color;
-use crate::ok;
-use crate::{println, serial_print, serial_println};
 use alloc::format;
 
 use super::super::ansii_parser;

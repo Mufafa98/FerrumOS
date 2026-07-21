@@ -1,6 +1,5 @@
 //! Keyboard task module
-use crate::{ok, print, println};
-use alloc::string::String;
+use crate::println;
 use conquer_once::spin::OnceCell;
 use core::{
     pin::Pin,
@@ -11,9 +10,7 @@ use futures_util::{
     stream::{Stream, StreamExt},
     task::AtomicWaker,
 };
-use lazy_static::lazy_static;
-use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use spin::Mutex;
+use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
 
 /// The scancode queue for keyboard input
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();

@@ -44,13 +44,21 @@ fn lapic_calibrate_ticks() -> u32 {
 
 #[derive(Debug, Copy, Clone)]
 enum LAPICTimerDivideValue {
+    #[allow(unused)]
     Div2 = 0b0000,
+    #[allow(unused)]
     Div4 = 0b0001,
+    #[allow(unused)]
     Div8 = 0b0010,
+    #[allow(unused)]
     Div16 = 0b0011,
+    #[allow(unused)]
     Div32 = 0b1000,
+    #[allow(unused)]
     Div64 = 0b1001,
+    #[allow(unused)]
     Div128 = 0b1010,
+    #[allow(unused)]
     Div1 = 0b1011,
 }
 use crate::drivers::apic::local_apic::{LAPICReg, LOCAL_APIC};
@@ -89,6 +97,7 @@ impl LAPICTimer {
     fn set_ticks(ticks: u32) {
         LOCAL_APIC.write_register(LAPICReg::TimerICnt, ticks);
     }
+    #[allow(unused)]
     fn get_ticks() -> u32 {
         LOCAL_APIC.read_register(LAPICReg::TimerCCnt)
     }

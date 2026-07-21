@@ -19,6 +19,7 @@ impl Time {
             Time::Seconds(n) => n * 1_000_000_000,
         }
     }
+    #[allow(unused)]
     fn to_femtoseconds(&self) -> u64 {
         match self {
             Time::Femtoseconds(n) => *n,

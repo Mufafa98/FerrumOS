@@ -1,6 +1,6 @@
 extern crate alloc;
 use crate::utils::port::*;
-use crate::{failed, ok, println, serial_println, warn};
+use crate::{failed, ok, serial_println, warn};
 use alloc::format;
 use alloc::vec::Vec;
 use bit_field::BitField;
@@ -192,7 +192,7 @@ impl Bus {
             hpet_timer.sleep(Time::Nanoseconds(400));
 
             let mut status = self.ata_reg.alternate_status_register.read();
-            let error = self.ata_reg.error_register.read();
+            let _error = self.ata_reg.error_register.read();
 
             if status == 0x00 {
                 warn!("{}Drive not found", debug_str);

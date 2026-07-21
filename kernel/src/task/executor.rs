@@ -1,5 +1,5 @@
 //! Task executor module
-use crate::{io::serial, serial_println};
+use crate::serial_println;
 
 use super::{Task, TaskId};
 use alloc::{collections::BTreeMap, sync::Arc, task::Wake};
@@ -114,7 +114,7 @@ pub fn run_executor() -> ! {
         executor.run_ready_tasks();
         executor.sleep_if_idle();
 
-        let mut task_remove_queue = super::REM_TASK_Q.lock();
+        let task_remove_queue = super::REM_TASK_Q.lock();
         while let Some(task_id) = task_remove_queue.pop() {
             let task_id = TaskId::from(task_id);
             if executor.tasks.remove(&task_id).is_none() {
@@ -126,7 +126,7 @@ pub fn run_executor() -> ! {
             serial_println!("Removed task with ID {:?}", task_id);
         }
 
-        let mut task_add_queue = super::ADD_TASK_Q.lock();
+        let task_add_queue = super::ADD_TASK_Q.lock();
         while let Some(task) = task_add_queue.pop() {
             executor.spawn(task);
         }

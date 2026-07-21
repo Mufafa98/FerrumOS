@@ -120,7 +120,6 @@ pub static LAPIC_TIMER_SLEEP_FLAG: AtomicBool = AtomicBool::new(false);
 pub static LAPIC_TIMER_SLEEP_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub extern "x86-interrupt" fn lapic_timer_handler_old(_stack_frame: InterruptStackFrame) {
     if LAPIC_TIMER_SLEEP_FLAG.load(Ordering::Relaxed) {
-        let ptr = LAPIC_TIMER_SLEEP_COUNTER.as_ptr();
         LAPIC_TIMER_SLEEP_COUNTER.fetch_sub(1, Ordering::Relaxed);
     }
 
@@ -140,13 +139,13 @@ use spin::Mutex;
 lazy_static! {
     pub static ref SLEEP_TASKS: Mutex<BTreeMap<u64, SleepEntry>> = Mutex::new(BTreeMap::new());
 }
-use alloc::vec;
+
 pub extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
     // print!(".");
     {
         let mut tasks = SLEEP_TASKS.lock();
         // let mut finished = vec![];
-        for (task_id, entry) in tasks.iter_mut() {
+        for (_, entry) in tasks.iter_mut() {
             if entry.remaining > 0 {
                 entry.remaining -= 1;
                 if entry.remaining == 0 {

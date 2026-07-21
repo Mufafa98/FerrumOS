@@ -6,12 +6,11 @@ use spin::Mutex;
 mod bub_tw; // Bottom Up Basic Text Writer
 mod tdf_tw; // Top Down Fancy Text Writer
 
-use crate::serial_println;
-
 use super::super::framebuffer::FRAMEBUFFER;
 use super::psf_font::PsfFont;
 use super::DEFAULT_FONT_DATA_BYTES;
 
+#[allow(unused)]
 use bub_tw::BubTextWriter;
 use tdf_tw::TdfTextWriter;
 

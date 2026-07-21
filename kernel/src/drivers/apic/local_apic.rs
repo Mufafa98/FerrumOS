@@ -1,5 +1,4 @@
 use crate::ok;
-use crate::println;
 use crate::serial_println;
 use crate::utils::msr::*;
 use crate::utils::registers::*;
