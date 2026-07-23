@@ -1,14 +1,16 @@
 use crate::{
     drivers::fonts::{ansii_parser::ansii_builder::AnsiiString, color::colors},
-    print, println, serial_println,
+    fs::ext2::file::File,
+    print, println,
+    shell::commands::write::WriteCommand,
 };
 
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use alloc::{boxed::Box, vec};
+use alloc::{collections::btree_map::BTreeMap, format};
 use lazy_static::lazy_static;
 use spin::Mutex;
-
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
 
 pub mod commands;
 pub mod input_dispatcher;
@@ -39,6 +41,9 @@ macro_rules! add_commands {
 pub struct Shell {
     commands: BTreeMap<String, Box<dyn Command>>,
     key_buffer: String,
+
+    history_cursor: Option<usize>,
+    history: Vec<String>,
 }
 impl Default for Shell {
     fn default() -> Self {
@@ -59,41 +64,151 @@ impl Default for Shell {
             // TODO: Add command
             // cp437 => CP437Command,
         );
-        Shell {
+        let mut shell = Shell {
             commands,
             key_buffer: String::new(),
-        }
+            history_cursor: None,
+            history: Vec::new(),
+        };
+        shell.load_from_file();
+        shell
     }
 }
 impl Shell {
     pub fn handle_input(&mut self, key: pc_keyboard::DecodedKey) {
+        use pc_keyboard::{DecodedKey, KeyCode};
         match key {
-            pc_keyboard::DecodedKey::Unicode(c) => {
-                if c == '\n' {
+            DecodedKey::Unicode(c) => self.handle_unicode_input(c),
+            DecodedKey::RawKey(KeyCode::ArrowUp) => self.show_previous_history(),
+            DecodedKey::RawKey(KeyCode::ArrowDown) => self.show_next_history(),
+            _ => {}
+        }
+    }
+
+    fn handle_unicode_input(&mut self, c: char) {
+        match c {
+            '\n' => {
+                if !self.key_buffer.is_empty() {
                     println!();
-                    self.execute_command(&self.key_buffer);
+                    self.execute_command();
                     self.key_buffer.clear();
-                    print_caret();
-                } else if c == '\x08' || c == '\x7f' {
-                    self.key_buffer.pop();
-                    print!("\x08 \x08");
-                } else {
-                    self.key_buffer.push(c);
-                    print!("{}", c);
+                    self.history_cursor = None;
                 }
+                print_caret();
+            }
+            '\x08' | '\x7f' => {
+                if self.key_buffer.pop().is_some() {
+                    print!("\x08 \x08");
+                }
+                self.history_cursor = None;
             }
             _ => {
-                // println!("Unsupported key: {:?}", key);
+                self.key_buffer.push(c);
+                print!("{}", c);
+                self.history_cursor = None;
             }
         }
     }
 
-    pub fn execute_command(&self, command: &str) {
-        let command = command.trim();
-        let mut parts: Vec<_> = command.split_whitespace().collect();
+    fn clear_key_buffer(&mut self) {
+        while self.key_buffer.pop().is_some() {
+            print!("\x08 \x08");
+        }
+    }
+
+    fn show_history_entry(&mut self, idx: usize) {
+        if let Some(entry) = self.history.get(idx).cloned() {
+            self.clear_key_buffer();
+            self.key_buffer.push_str(&entry);
+            print!("{}", entry);
+        }
+    }
+
+    fn show_previous_history(&mut self) {
+        if self.history.is_empty() {
+            return;
+        }
+
+        let next_cursor = match self.history_cursor {
+            None => self.history.len() - 1,
+            Some(0) => 0,
+            Some(idx) => idx - 1,
+        };
+
+        self.history_cursor = Some(next_cursor);
+        self.show_history_entry(next_cursor);
+    }
+
+    fn show_next_history(&mut self) {
+        if self.history.is_empty() {
+            return;
+        }
+
+        match self.history_cursor {
+            None => {}
+            Some(idx) if idx + 1 < self.history.len() => {
+                let next_cursor = idx + 1;
+                self.history_cursor = Some(next_cursor);
+                self.show_history_entry(next_cursor);
+            }
+            Some(_) => {
+                self.history_cursor = None;
+                self.clear_key_buffer();
+            }
+        }
+    }
+
+    fn load_from_file(&mut self) {
+        let mut file = match File::from_path("cmd_history") {
+            Ok(file) => file,
+            Err(_) => return,
+        };
+
+        let mut buffer = [0u8; 1024];
+        let mut command_buffer = String::new();
+
+        loop {
+            let bytes_read = file.read(&mut buffer, 1024);
+            if bytes_read == 0 {
+                break;
+            }
+
+            for item in buffer.iter().take(bytes_read) {
+                if *item != 0 {
+                    command_buffer.push(*item as char);
+                }
+            }
+        }
+
+        self.history = command_buffer
+            .split('\n')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+    }
+
+    fn add_to_history(&mut self, command: &str, args: Vec<&str>) {
+        let writer = WriteCommand::new();
+        let cmd = format!("{} {}", command, args.join(" "));
+        writer.execute(vec!["cmd_history", "-c", "-a", &cmd, "\n"], &self);
+        self.history.push(cmd);
+        self.history_cursor = None;
+    }
+
+    pub fn execute_command(&mut self) {
+        let key_buffer = self.key_buffer.clone();
+        let command_line = key_buffer.trim();
+
+        if command_line.is_empty() {
+            return;
+        }
+
+        let mut parts: Vec<_> = command_line.split_whitespace().collect();
         let command = parts.remove(0);
         let args: Vec<&str> = parts;
-        serial_println!("Executing command: {:?}", command);
+
+        self.add_to_history(command, args.clone());
+
         if let Some(cmd) = self.commands.get(command) {
             cmd.execute(args, self);
         } else {

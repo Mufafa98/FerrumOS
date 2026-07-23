@@ -1,6 +1,6 @@
+use crate::print;
 use crate::shell::manual_builder::ManualBuilder;
 use crate::shell::{Command, Shell};
-use crate::{print, println};
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -28,6 +28,10 @@ impl Command for WriteCommand {
                     "-a, --append",
                     "[options] Append content to the file instead of overwriting it",
                 )
+                .arg(
+                    "-c, --create",
+                    "[options] Create the file if it does not exist",
+                )
                 .example(
                     "write my_file.txt 'Hello, World!'",
                     "Writes 'Hello, World!' to 'my_file.txt'",
@@ -39,45 +43,76 @@ impl Command for WriteCommand {
         }
     }
     fn execute(&self, args: Vec<&str>, _: &Shell) {
-        if args.is_empty() {
-            print!("{}", self.manual.build_usage());
-            return;
-        }
-        if args.len() < 2 {
+        if args.is_empty() || args.len() < 2 {
             print!("{}", self.manual.build_usage());
             return;
         }
         let file_path = args[0];
+        let create = args.contains(&"-c") || args.contains(&"--create");
+        let append = args.contains(&"-a") || args.contains(&"--append");
+
         use crate::fs::ext2::file::File;
-        let file = File::from_path(file_path);
-        if file.is_err() {
-            println!("Error opening file: {}", file_path);
+
+        let mut file = match File::from_path(file_path) {
+            Ok(file) => file,
+            Err(_) if create => {
+                use crate::fs::ext2::touch;
+                touch(file_path);
+
+                match File::from_path(file_path) {
+                    Ok(file) => file,
+                    Err(_) => {
+                        // println!("Error creating file: {}", file_path);
+                        return;
+                    }
+                }
+            }
+            Err(_) => {
+                // println!("Error opening file: {}", file_path);
+                return;
+            }
+        };
+
+        let content = {
+            if append {
+                file.seek_end();
+            }
+            args[1..]
+                .iter()
+                .copied()
+                .filter(|arg| {
+                    *arg != "-a" && *arg != "--append" && *arg != "-c" && *arg != "--create"
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
+        if content.is_empty() {
+            print!("{}", self.manual.build_usage());
             return;
         }
-        let mut file = file.unwrap();
-        let mut content = args[1..].join(" ");
-        if args[1] == "-a" || args[1] == "--append" {
-            file.seek_end();
-            content = args[2..].join(" ");
-        }
+
         let mut offset = 0;
         loop {
             let bytes_to_write = content.len() - offset;
             if bytes_to_write == 0 {
-                break; // All content has been written
+                break;
             }
             let bytes_written = file.write(&content.as_bytes()[offset..], bytes_to_write);
             if bytes_written == 0 {
-                println!("Failed to write to file: {}", file_path);
+                // println!("Failed to write to file: {}", file_path);
                 return;
             }
             offset += bytes_written;
         }
-        if offset > 0 {
-            println!("Successfully wrote {} bytes to {}", offset, file_path);
-        } else {
-            println!("No content written to {}", file_path);
-        }
+
+        // should add an argument for verbosity
+
+        // if offset > 0 {
+        //     println!("Successfully wrote {} bytes to {}", offset, file_path);
+        // } else {
+        //     println!("No content written to {}", file_path);
+        // }
     }
     fn description(&self) -> String {
         self.manual.build_short()
