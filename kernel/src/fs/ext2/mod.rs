@@ -834,7 +834,7 @@ fn find_by_path(path: &str) -> Option<DirEntry> {
                 return Some(entry);
             }
         } else {
-            println!("File not found: {}", current_path);
+            // println!("File not found: {}", current_path);
             return None;
         }
     }
@@ -972,12 +972,14 @@ pub fn ls(path: Option<&str>) -> Vec<FileData> {
 }
 
 pub fn touch(path: &str) {
-    let entry = DirEntry::create_fs_entry(path, InodeType::RegularFile);
+    let _entry = DirEntry::create_fs_entry(path, InodeType::RegularFile);
 
-    match entry {
-        Ok(entry) => println!("File {} created successfully", entry.name),
-        Err(err) => println!("Failed to create file: {}. Error: {:?}", path, err),
-    }
+    // should return some kind of error or success
+
+    // match entry {
+    //     Ok(entry) => println!("File {} created successfully", entry.name),
+    //     Err(err) => println!("Failed to create file: {}. Error: {:?}", path, err),
+    // }
 }
 
 pub fn mkdir(path: &str) {
